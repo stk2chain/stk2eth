@@ -1,0 +1,250 @@
+{
+	"menus": {
+		"InitialScreen": {
+			"text": "Welcome to USSDETH",
+			"screen_type": "Initial",
+			"default_next_screen": "MainScreen"
+		},
+		"MainScreen": {
+			"text": "USSDETH Main Menu",
+			"screen_type": "Menu",
+			"default_next_screen": "DefaultNoneScreen",
+			"menu_items": {
+				"SendETHOption": {
+					"option": "1",
+					"display_name": "Send ETH",
+					"next_screen": "ToNumberScreen"
+				},
+				"SwapOption": {
+					"option": "2",
+					"display_name": "Swap",
+					"next_screen": "SwapScreen"
+				},
+				"WithdrawOption": {
+					"option": "3",
+					"display_name": "Withdraw Cash",
+					"next_screen": "WithdrawScreen"
+				},
+				"BalanceOption": {
+					"option": "1",
+					"display_name": "Check Balance",
+					"next_screen": "BalanceScreen"
+				},
+				"SendMoneyOption": {
+					"option": "2",
+					"display_name": "Send Money",
+					"next_screen": "SendMoneyScreen"
+				},
+				"AirtimeOption": {
+					"option": "3",
+					"display_name": "Buy Airtime",
+					"next_screen": "AirtimeScreen"
+				}
+			}
+		},
+		"DefaultNoneScreen": {
+			"text": "Thank you for using USSDETH",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+
+        "ToNumberScreen": {
+			"text": "Enter Phone No.",
+			"screen_type": "Input",
+			"input_identifier": "to_phone_number",
+			"default_next_screen": "ToAmountScreen"
+		},
+		"ToAmountScreen": {
+			"text": "Amount",
+			"screen_type": "Input",
+			"input_identifier": "to_amount",
+			"default_next_screen": "PINScreen"
+		},
+        "PINScreen": {
+			"text": "PIN",
+			"screen_type": "Input",
+			"input_identifier": "pin",
+			"default_next_screen": "CancelTXScreen"
+		},
+        "CancelTXScreen": {
+			"text": "SENDING  2,622.36 ETH  to +10000.....,\ntransaction cost 3. Reply ANY INPUT to\ncancel transaction.",
+			"screen_type": "Input",
+			"input_identifier": "canceltx",
+			"default_next_screen": "CancelTXFxScreen"
+		},
+		"CancelTXFxScreen": {
+			"text": "Processing...",
+			"screen_type": "Function",
+			"function": "validate_canceltx",
+			"default_next_screen": "SendETHRouterScreen"
+		},
+		"SendETHRouterScreen": {
+			"text": "Selecting...",
+			"screen_type": "Router",
+			"router": "SendETHScreen",
+			"router_options": [
+				{
+					"router_option": "{{airtime.status == 'success'}}",
+					"next_screen": "SuccessScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'failed'}}",
+					"next_screen": "FailureScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'error'}}",
+					"next_screen": "FailureScreen"
+				}
+			],
+			"default_next_screen": "DefaultNoneScreen"
+		},
+		"SuccessScreen": {
+			"text": "Transaction Successful {{airtime.message}}",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"FailureScreen": {
+			"text": "Transaction Failed {{airtime.message}}",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"BalanceInquiryScreen": {
+			"text": "Select Account",
+			"screen_type": "Menu",
+			"default_next_screen": "MainScreen",
+			"menu_items": {
+				"SavingsOption": {
+					"option": "1",
+					"display_name": "Savings",
+					"next_screen": "MainScreen"
+				},
+				"CurrentOption": {
+					"option": "2",
+					"display_name": "Current",
+					"next_screen": "MainScreen"
+				}
+			}
+		},
+		"SendMoneyScreen": {
+			"text": "Select option",
+			"screen_type": "Menu",
+			"default_next_screen": "MainScreen",
+			"menu_items": {
+				"OwnAccountOption": {
+					"option": "1",
+					"display_name": "Own Account",
+					"next_screen": "MainScreen"
+				},
+				"OtherAccountOption": {
+					"option": "2",
+					"display_name": "Other Account",
+					"next_screen": "MainScreen"
+				}
+			}
+		},
+		"AirtimeScreen": {
+			"text": "Select option",
+			"screen_type": "Menu",
+			"default_next_screen": "MainScreen",
+			"menu_items": {
+				"OwnNumberOption": {
+					"option": "1",
+					"display_name": "Own Number",
+					"next_screen": "OwnNumberAmountScreen"
+				},
+				"OtherNumberOption": {
+					"option": "2",
+					"display_name": "Other Number",
+					"next_screen": "OtherNumberPhoneScreen"
+				}
+			}
+		},
+		"OtherNumberPhoneScreen": {
+			"text": "Enter phone number",
+			"screen_type": "Input",
+			"input_identifier": "phone_number",
+			"default_next_screen": "OtherNumberAmountScreen"
+		},
+		"OtherNumberAmountScreen": {
+			"text": "Enter amount",
+			"screen_type": "Input",
+			"input_identifier": "amount",
+			"default_next_screen": "OtherNumberFunctionScreen"
+		},
+		"OtherNumberFunctionScreen": {
+			"text": "Processing...",
+			"screen_type": "Function",
+			"function": "buy_airtime",
+			"default_next_screen": "OtherNumberRouterScreen"
+		},
+		"OtherNumberRouterScreen": {
+			"text": "Selecting...",
+			"screen_type": "Router",
+			"router": "AirtimeScreen",
+			"router_options": [
+				{
+					"router_option": "{{airtime.status == 'success'}}",
+					"next_screen": "SuccessScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'failed'}}",
+					"next_screen": "FailureScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'error'}}",
+					"next_screen": "FailureScreen"
+				}
+			],
+			"default_next_screen": "DefaultNoneScreen"
+		},
+		"OwnNumberAmountScreen": {
+			"text": "Enter amount",
+			"screen_type": "Input",
+			"input_identifier": "amount",
+			"default_next_screen": "OwnNumberFunctionScreen"
+		},
+		"OwnNumberFunctionScreen": {
+			"text": "Processing...",
+			"screen_type": "Function",
+			"function": "buy_airtime",
+			"default_next_screen": "OwnNumberRouterScreen"
+		},
+		"OwnNumberRouterScreen": {
+			"text": "Selecting...",
+			"screen_type": "Router",
+			"router": "AirtimeScreen",
+			"router_options": [
+				{
+					"router_option": "{{airtime.status == 'success'}}",
+					"next_screen": "SuccessScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'failed'}}",
+					"next_screen": "FailureScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'error'}}",
+					"next_screen": "FailureScreen"
+				}
+			],
+			"default_next_screen": "DefaultNoneScreen"
+		},
+		"SuccessScreen": {
+			"text": "Transaction Successful {{airtime.message}}",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"FailureScreen": {
+			"text": "Transaction Failed {{airtime.message}}",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		}
+	},
+	"services": {
+		"buy_airtime": {
+			"function_name": "buy_airtime",
+			"function_url": "http://localhost:3000/buy_airtime",
+			"data_key": "airtime"
+		}
+	}
+}
