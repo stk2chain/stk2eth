@@ -69,7 +69,6 @@ impl From<FrameworkScreenType> for ScreenType {
 pub struct USSDScreen {
     #[primary_key]
     id: u64,
-    #[unique]
     ussd_menu: u64,
     text: String,
     screen_type: ScreenType,
@@ -97,7 +96,6 @@ pub struct USSDRouterOption {
     router_option: String,
     next_screen: String
 }
-
 
 
 // Initialize SessionID USSD Menu from json
@@ -130,9 +128,9 @@ pub fn init(ctx: &ReducerContext) {
     });
 
     //      2. Insert USSDScreen Rows linked to USSD Menu(ServiceCode)
-    for (name, screen) in menu_screens.menus{
+    for (index, (name, screen)) in menu_screens.menus.into_iter().enumerate(){
         let scrn = ctx.db.ussd_screen().insert( USSDScreen {
-            id: 0,
+            id: index as u64,
             ussd_menu: menu.id,
             text: screen.text,
             screen_type: screen.screen_type.into(),
@@ -212,8 +210,6 @@ pub fn handle_ussd(ctx: &ReducerContext, sessionId: String, phoneNumber: String,
 
 
     // Load Menus
-    // let content = include_str!("../examples/data/menu.json");
-    // let menus: USSDMenu = serde_json::from_str(&content).unwrap();
     // let menu = ctx.db.ussd_menu().serviceCode().find(serviceCode);
 
 
