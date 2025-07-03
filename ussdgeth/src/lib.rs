@@ -2,14 +2,15 @@ mod ussdframework;
 
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType};
 use ussdframework::{
-    USSDMenu as JSONMenu
+    USSDMenu as FrameworkMenu,
+    ScreenType as FrameworkScreenType
 };
 
 #[table(name = ussd_session)]
 pub struct USSDSession {
     #[primary_key]
     sessionId: String,              // sessionId *PK
-    phone: String,                  // msisdn/phoneNumber
+    phoneNumber: String,                  // msisdn/phoneNumber
     networkCode: String,            //networkCode
     serviceCode: String,            //serviceCode
     data: String,                   //data/text
@@ -51,6 +52,19 @@ pub enum ScreenType {
     Quit,
 }
 
+
+impl From<FrameworkScreenType> for ScreenType {
+    fn from(ext: FrameworkScreenType) -> Self {
+        match ext {
+            FrameworkScreenType::Initial => ScreenType::Initial,
+            FrameworkScreenType::Menu => ScreenType::Menu,
+            FrameworkScreenType::Input => ScreenType::Input,
+            FrameworkScreenType::Function => ScreenType::Function,
+            FrameworkScreenType::Router => ScreenType::Router,
+            FrameworkScreenType::Quit => ScreenType::Quit,
+        }
+    }
+}
 #[table(name = ussd_screen)]
 pub struct USSDScreen {
     #[primary_key]
@@ -65,7 +79,7 @@ pub struct USSDScreen {
     function: Option<String>,
     //router_options
     input_identifier: Option<String>,
-    name: String //Scren Name
+    name: String //Screen Name
 
 }
 
@@ -85,6 +99,7 @@ pub struct USSDRouterOption {
 }
 
 
+
 // Initialize SessionID USSD Menu from json
 // USSDMenu: List of USSDScreens
 //      ScreenTypes: (Initial, Menu, Input, Function, Router, Quit)
@@ -101,47 +116,50 @@ pub struct USSDRouterOption {
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
     // Called when the module is initially published (constructor)
-    // Fetch USSD Menu
+    // Fetch USSD Menu ABI
     let content = include_str!("./data/menu.json");
-    let menu_screens: JSONMenu = serde_json::from_str(&content).unwrap();
+    let menu_screens: FrameworkMenu = serde_json::from_str(&content).unwrap();
 
     // log::info!("USSDGETH Menu Screens, {:?}!", menu_screens);
 
-    // Write to DB: Insert DB Rows
-    //      1. Insert USSDMenu Row with ID: TODO: Insert Service Code
+    // Write to DB: (Insert DB Rows)
+    //      1. Insert USSDMenu Row with ID: TODO: Seperate Service Code
     let menu = ctx.db.ussd_menu().insert(USSDMenu {
+        id: 0,
         service_code: "*4337#".to_string(),
     });
+
     //      2. Insert USSDScreen Rows linked to USSD Menu(ServiceCode)
-    for screen in menu_screens.menus{
+    for (name, screen) in menu_screens.menus{
         let scrn = ctx.db.ussd_screen().insert( USSDScreen {
+            id: 0,
             ussd_menu: menu.id,
             text: screen.text,
-            screen_type: screen.screen_type,
+            screen_type: screen.screen_type.into(),
             default_next_screen: screen.default_next_screen,
-            service_code: menu.service_code,
+            service_code: "*4337#".to_string(),
             function: screen.function,
             input_identifier: screen.input_identifier,
-            name: screen.name
+            name: name.to_string()
         });
 
         //      3. Insert Other Sub USSDScreen Rows linked to USSDScreen
         //      3.1 menu_items
-        if screen.menu_items { // If screen.type == Menu
-            for item in screen.menu_items{
+        if let Some(menu_items) = screen.menu_items { // If screen.type == Menu
+            for (name, item) in menu_items{
                 ctx.db.menu_item().insert( USSDMenuItem {
                     option: item.option,
                     display_name: item.display_name,
                     next_screen: item.next_screen,
-                    name: item.name,
+                    name: name,
                     screen: scrn.id
                 });
             }
         }
 
         //      3.2 router_options
-        if screen.router_options {
-            for option in screen.router_option{
+        if let Some(router_options) = screen.router_options { // If screen.type == Router
+            for option in router_options{
                 ctx.db.router_option().insert( USSDRouterOption {
                     router_option: option.router_option,
                     next_screen: option.next_screen
@@ -151,7 +169,6 @@ pub fn init(ctx: &ReducerContext) {
         }
 
     }
-
 
     //      4. Insert Function Screen services
     log::info!("USSDGETH Ininialized by, {}!", ctx.sender);

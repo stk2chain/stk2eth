@@ -11,7 +11,7 @@ pub use ussd_menu::USSDMenu;
 // pub use ussd_request::USSDRequest;
 // pub use ussd_response::USSDResponse;
 // pub use ussd_screens::{ScreenType, USSDAction};
-// pub use ussd_screens::{ScreenType};
+pub use ussd_screens::{ScreenType};
 
 // pub use ussd_service::USSDService;
 // pub use ussd_session::{InMemorySessionStore, SessionCache, USSDSession};
