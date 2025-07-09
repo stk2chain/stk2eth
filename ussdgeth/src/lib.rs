@@ -6,9 +6,6 @@ use ussdframework::{
     ScreenType as FrameworkScreenType
 };
 
-// MERGING PRIVATE AND PUBLIC EQUITY CLASS
-// PRIVATE EQUITY PUBLIC OTC ON STERIODS.
-
 // #[table(name = ussd_session)]
 // pub struct USSDSession {
 //     #[primary_key]
@@ -37,7 +34,7 @@ use ussdframework::{
 pub struct USSDSession {
     #[primary_key]
     session_id: String,              // sessionId *PK
-    phone_nunber: String,                  // msisdn/phoneNumber
+    phone_number: String,                  // msisdn/phoneNumber
     network_code: String,            //networkCode
     service_code: String,            //serviceCode
     data: String,                   //data/text
@@ -46,13 +43,13 @@ pub struct USSDSession {
     visited_screens: Vec<String>,
     last_interaction_time: Timestamp,
 
-    error_message: Option<String>,
+    // error_message: Option<String>,
     //displayed: HashMap<String, bool>,
 
     end_session: bool,
     //language: String,
-
-    identity: Identity,
+    #[unique]
+    sender: Identity,
     online: bool,
 
     //position_in_menu
@@ -96,6 +93,7 @@ impl From<FrameworkScreenType> for ScreenType {
 pub struct USSDScreen {
     #[primary_key]
     id: u64,
+    #[index(btree)]
     ussd_menu: u64,
     text: String,
     screen_type: ScreenType,
@@ -108,6 +106,8 @@ pub struct USSDScreen {
     name: String //Screen Name
 
 }
+
+
 
 #[table(name = menu_item)]
 pub struct USSDMenuItem {
@@ -123,6 +123,7 @@ pub struct USSDRouterOption {
     router_option: String,
     next_screen: String
 }
+
 
 
 // Initialize SessionID USSD Menu from json
@@ -210,8 +211,8 @@ pub fn identity_connected(ctx: &ReducerContext) {
 pub fn identity_disconnected(ctx: &ReducerContext) {
     // Called everytime a client disconnects
     // we set online to false
-    if let Some(session_retrieved) = ctx.db.ussd_session().identity().find(ctx.sender){
-        ctx.db.ussd_session().update( USSDSession {online:false, ..session_retrieved} );
+    if let Some(session_retrieved) = ctx.db.ussd_session().sender().find(ctx.sender){
+        ctx.db.ussd_session().sender().update( USSDSession {online:false, ..session_retrieved} );
         log::info!("Client disconnected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
     }else {
         // This branch should be unreachable,
@@ -223,27 +224,51 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
 
 
 #[reducer]
- pub fn get_or_create_session(ctx: &ReducerContext, session_id: String, initial_screen: String){
+ pub fn get_or_create_session(ctx: &ReducerContext, session_id: String, phone_number: String, network_code: String, service_code:String,  text: String, initial_screen: String){
     //let retrieved_session = USSDSession::retrieve_session(&request.session_id, &cache);
     // Retrieve Session based on sessionID, expect single instance
     // we set online to true
-    if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id){
-        ctx.db.ussd_session().update( USSDSession {
+    if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id.clone()){
+        ctx.db.ussd_session().session_id().update( USSDSession {
+            phone_number: phone_number,
+            network_code: network_code,
+            service_code: service_code,
+            data: text,
             current_screen: initial_screen,
-            online:True,
+            sender: ctx.sender,
+            online:true,
             last_interaction_time: ctx.timestamp,
+            ..session_retrieved
         });
 
     }else {
         ctx.db.ussd_session().insert( USSDSession {
             session_id: session_id,
+            phone_number: phone_number,
+            network_code: network_code,
+            service_code: service_code,
+            data: text,
             current_screen: initial_screen,
-            online:True,
+            sender: ctx.sender,
+            online:true,
             last_interaction_time: ctx.timestamp,
+            visited_screens: Vec::new(),
+            end_session: false
+
         });
     }
  }
 
+
+//  #[reducer]
+pub fn get_initial_screen(ctx: &ReducerContext) -> String {
+    for screen in ctx.db.ussd_screen().iter() {
+        if let ScreenType::Initial = screen.screen_type {
+            return screen.name;
+        }
+    }
+    panic!("No initial screen found!");
+}
 
 // #[reducer]
 // pub fn execute_screen(ctx: &ReducerContext, &text: String, &menu){
@@ -255,17 +280,31 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
 pub fn handle_ussd(ctx: &ReducerContext, sessionId: String, phoneNumber: String, networkCode: String, serviceCode:String,  text: String){
 
 
-    log::info!("handle_ussd, {}:{}:{}:{}:{}:{}!", ctx.sender, sessionId, phoneNumber, networkCode, serviceCode, text);
+    // log::info!("handle_ussd, {}:{}:{}:{}:{}:{}!", ctx.sender, sessionId, phoneNumber, networkCode, serviceCode, text);
 
 
     // Load Menus
-    let menu = ctx.db.ussd_menu().service_code().find(service_code=serviceCode);
+    if let Some(menu)= ctx.db.ussd_menu().service_code().find(serviceCode.clone()){
+        let screens = ctx.db.ussd_screen().ussd_menu().filter(menu.id);
 
-    let screens = ctx.db.ussd_screen().ussd_menu().find(menu.id);
+        let initial_screen= get_initial_screen(ctx);
+
+        //1. Retrieve or Generate Session
+        let mut session = get_or_create_session(ctx, sessionId.clone(), phoneNumber, networkCode, serviceCode, text, initial_screen);
+
+    }else {
+        // This branch should be unreachable,
+        log::warn!("Unknown Menu serviceCode {}", serviceCode);
+
+    }
 
 
-    //1. Retrieve or Generate Session
-    let mut session = get_or_create_session(ctx, &sessionId, &initial_screen);
+    // let initial_screen = screens.get_initial_screen();
+
+
+
+
+
 
     //let mut session = USSDSession::get_or_create_session(request, &initial_screen, session_cache);
     // let retrieved_session = USSDSession::retrieve_session(&request.session_id, &cache);
