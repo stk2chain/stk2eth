@@ -6,3 +6,20 @@ ussdgeth/target/
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
 ussdgeth/Cargo.lock
+
+
+contracts/.gitignore
+
+contracts/cache/
+contracts/out/
+
+# Ignores development broadcast logs
+contracts/!/broadcast
+contracts/broadcast/*/31337/
+contracts//broadcast/**/dry-run/
+
+# Docs
+contracts/docs/
+
+# Dotenv file
+contracts/.env
