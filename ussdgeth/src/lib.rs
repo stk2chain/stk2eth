@@ -65,6 +65,17 @@ pub struct USSDMenu {
     //networkCode: String,          //99999 V2
 }
 
+#[table(name = ussd_service)]
+pub struct USSDServiceRow {
+    #[primary_key]
+    id: u64,
+    ussd_menu: u64,
+    name: String,
+    function_name: String,
+    function_url: Option<String>,
+    data_key: String,
+}
+
 #[derive(SpacetimeType)]
 pub enum ScreenType {
     //#[default]
@@ -195,9 +206,31 @@ pub fn init(ctx: &ReducerContext) {
         }
 
     }
-
     //      4. Insert Function Screen services
+    for (name, service) in menu_screens.services.into_iter() {
+            ctx.db.ussd_service().insert(USSDServiceRow {
+                id: 0,
+                ussd_menu: menu.id,
+                name: name,
+                function_name: service.function_name,
+                function_url: service.function_url,
+                data_key: service.data_key,
+            });
+    }
     log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn menu_json_contains_send_eth_service() {
+        let content = include_str!("./data/menu.json");
+        let menu: ussdframework::USSDMenu = serde_json::from_str(content).expect("failed to parse menu.json");
+        assert!(menu.services.contains_key("send_eth"), "menu.json should contain a send_eth service");
+    }
 }
 
 #[spacetimedb::reducer(client_connected)]
