@@ -56,7 +56,7 @@ test:
 # Deploy module to SpacetimeDB (remote)
 deploy-db:
 	@echo "Deploying $(SPACETIME_DB_NAME) to $(SPACETIME_SERVER)..."
-	@cd ussdgeth && spacetime publish -s $(SPACETIME_SERVER) --clear-database $(SPACETIME_DB_NAME)
+	@cd ussdgeth && spacetime publish -s $(SPACETIME_SERVER) -- $(SPACETIME_DB_NAME) --clear-database
 	@echo "✓ Database deployed"
 
 # Run USSD client
