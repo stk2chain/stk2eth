@@ -35,7 +35,7 @@ contracts/.env
 # Logs
 *.log
 
-
+.env
 # IDE/editor temporary files
 *.swp
 *.DS_Store
