@@ -1,7 +1,6 @@
 use spacetimedb::{ReducerContext, reducer};
 use crate::{Swap, USSDSession, ussd_session, swap};
 use spacetimedb::Table;
-use std::cmp::Ord;
 
 /// Validates Ethereum address format
 fn is_valid_eth_address(address: &str) -> bool {
