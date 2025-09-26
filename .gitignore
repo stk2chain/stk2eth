@@ -31,6 +31,7 @@ contracts/.env
 
 # Cargo generated files
 **/*.rs.bk
+working/
 
 # Logs
 *.log
