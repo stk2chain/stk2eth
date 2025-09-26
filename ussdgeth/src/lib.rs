@@ -1,4 +1,6 @@
 mod ussdframework;
+mod audit_tests;
+mod audit_reducers;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -51,6 +53,46 @@ pub struct USSDSession {
     sender: Identity,
     online: bool,
     //position_in_menu
+}
+
+// FATF Travel Rule Compliance: Audit Log for Send ETH Transactions
+#[table(name = eth_audit_logs)]
+pub struct EthAuditLog {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    // Core transaction data
+    #[index(btree)]
+    pub tx_hash: String,
+    pub from_address: String,
+    pub to_address: String,
+    pub amount: String,
+    #[index(btree)]
+    pub phone_number: String,
+    pub session_id: String,
+    pub timestamp: Timestamp,
+
+    // FATF Travel Rule fields (required for transactions over threshold)
+    pub originator_name: Option<String>,      // Sender's full name
+    pub beneficiary_name: Option<String>,     // Recipient's full name
+    pub originator_country: Option<String>,   // Sender's country code (ISO 3166-1 alpha-2)
+    pub beneficiary_country: Option<String>,  // Recipient's country code
+    pub originator_address: Option<String>,   // Sender's physical address
+    pub beneficiary_address: Option<String>,  // Recipient's physical address
+    pub originator_id: Option<String>,        // Sender's ID number/passport
+    pub beneficiary_id: Option<String>,       // Recipient's ID number/passport
+
+    // Additional compliance fields
+    pub transaction_type: String,             // "SEND_ETH", "SWAP", etc.
+    pub network: String,                      // "ethereum", "polygon", etc.
+    pub gas_fee: Option<String>,              // Gas fee paid
+    pub exchange_rate: Option<String>,        // ETH/USD rate at time of transaction
+    pub compliance_status: String,            // "COMPLIANT", "FLAGGED", "UNDER_REVIEW"
+    pub risk_score: Option<u32>,              // Risk assessment score (0-100)
+
+    // Immutability guarantee
+    pub is_immutable: bool,                   // Always true once created
 }
 
 #[table(name = ussd_menu)] //TODO: Rename to ServiceCode
