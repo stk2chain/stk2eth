@@ -8,8 +8,8 @@ use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Starting Testnet Validation for send_eth reducer");
-    println!("📋 Target: 100 transfers with balance delta validation");
+    println!("Starting Testnet Validation for send_eth reducer");
+    println!("Target: 100 transfers with balance delta validation");
     
     // Configuration
     let spacetimedb_url = "http://localhost:3000";
@@ -17,32 +17,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let test_accounts = generate_test_accounts();
     let transfers_to_test = 100;
     
-    println!("⚙️  Configuration:");
+    println!("   Configuration:");
     println!("   - SpacetimeDB: {}", spacetimedb_url);
     println!("   - Testnet RPC: {}", testnet_rpc);
     println!("   - Test accounts: {}", test_accounts.len());
     println!("   - Transfers: {}", transfers_to_test);
     
     // Step 1: Check initial balances
-    println!("\n📊 Step 1: Recording initial balances");
+    println!("\n Step 1: Recording initial balances");
     let initial_balances = get_balances(&testnet_rpc, &test_accounts).await?;
     print_balances("Initial", &initial_balances);
     
     // Step 2: Execute transfers via SpacetimeDB reducer
-    println!("\n🔄 Step 2: Executing {} transfers via send_eth reducer", transfers_to_test);
+    println!("\n Step 2: Executing {} transfers via send_eth reducer", transfers_to_test);
     let transfer_results = execute_transfers(spacetimedb_url, &test_accounts, transfers_to_test).await?;
     
     // Step 3: Wait for transactions to be processed
-    println!("\n⏳ Step 3: Waiting for blockchain processing...");
+    println!("\n Step 3: Waiting for blockchain processing...");
     sleep(Duration::from_secs(30)).await; // Give time for transactions to mine
     
     // Step 4: Check final balances
-    println!("\n📊 Step 4: Recording final balances");
+    println!("\n Step 4: Recording final balances");
     let final_balances = get_balances(&testnet_rpc, &test_accounts).await?;
     print_balances("Final", &final_balances);
     
     // Step 5: Validate balance deltas
-    println!("\n✅ Step 5: Validating balance deltas");
+    println!("\n Step 5: Validating balance deltas");
     let validation_result = validate_balance_deltas(
         &initial_balances, 
         &final_balances, 
@@ -51,15 +51,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     match validation_result {
         Ok(summary) => {
-            println!("🎉 VALIDATION PASSED!");
-            println!("📈 Summary:");
+            println!(" VALIDATION PASSED!");
+            println!(" Summary:");
             println!("   - Successful transfers: {}", summary.successful_transfers);
             println!("   - Failed transfers: {}", summary.failed_transfers);
             println!("   - Total ETH moved: {:.4} ETH", summary.total_eth_moved);
-            println!("   - Balance delta match: ✅");
+            println!("   - Balance delta match: ");
         }
         Err(e) => {
-            println!("❌ VALIDATION FAILED: {}", e);
+            println!(" VALIDATION FAILED: {}", e);
             std::process::exit(1);
         }
     }
