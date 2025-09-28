@@ -1,0 +1,21 @@
+[package]
+name = "e2e-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+anyhow = { workspace = true }
+dotenv = { workspace = true }
+
+# Testing dependencies
+tokio-test = "0.4"
+wiremock = "0.6"
+assert_matches = "1.5"
+chrono = { workspace = true }
+
+# E2E testing utilities
+uuid = "1.10"

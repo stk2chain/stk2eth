@@ -1,19 +1,19 @@
 {
 	"menus": {
 		"InitialScreen": {
-			"text": "Welcome to USSDETH",
+			"text": "Welcome to M-ETH",
 			"screen_type": "Initial",
 			"default_next_screen": "MainScreen"
 		},
 		"MainScreen": {
-			"text": "USSDETH Main Menu",
+			"text": "M-ETH Main Menu\n1. Send ETH\n2. Swap\n3. Withdraw Cash\n4. Buy Airtime\n5. My Account\n6. Check Balance",
 			"screen_type": "Menu",
 			"default_next_screen": "DefaultNoneScreen",
 			"menu_items": {
 				"SendETHOption": {
 					"option": "1",
 					"display_name": "Send ETH",
-					"next_screen": "ToNumberScreen"
+					"next_screen": "SendETHAmountScreen"
 				},
 				"SwapOption": {
 					"option": "2",
@@ -25,226 +25,177 @@
 					"display_name": "Withdraw Cash",
 					"next_screen": "WithdrawScreen"
 				},
-				"BalanceOption": {
-					"option": "1",
-					"display_name": "Check Balance",
-					"next_screen": "BalanceScreen"
-				},
-				"SendMoneyOption": {
-					"option": "2",
-					"display_name": "Send Money",
-					"next_screen": "SendMoneyScreen"
-				},
 				"AirtimeOption": {
-					"option": "3",
+					"option": "4",
 					"display_name": "Buy Airtime",
 					"next_screen": "AirtimeScreen"
+				},
+				"AccountOption": {
+					"option": "5",
+					"display_name": "My Account",
+					"next_screen": "AccountScreen"
+				},
+				"BalanceOption": {
+					"option": "6",
+					"display_name": "Check Balance",
+					"next_screen": "BalanceScreen"
 				}
 			}
 		},
 		"DefaultNoneScreen": {
-			"text": "Thank you for using USSDETH",
+			"text": "Thank you for using M-ETH",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
-
-        "ToNumberScreen": {
-			"text": "Enter Phone No.",
+		"SendETHAmountScreen": {
+			"text": "Enter ETH amount:",
 			"screen_type": "Input",
-			"input_identifier": "to_phone_number",
-			"default_next_screen": "ToAmountScreen"
+			"input_identifier": "eth_amount",
+			"default_next_screen": "SendETHRecipientScreen"
 		},
-		"ToAmountScreen": {
-			"text": "Amount",
+		"SendETHRecipientScreen": {
+			"text": "Enter recipient address:",
 			"screen_type": "Input",
-			"input_identifier": "to_amount",
-			"default_next_screen": "PINScreen"
+			"input_identifier": "recipient_address",
+			"default_next_screen": "SendETHConfirmScreen"
 		},
-        "PINScreen": {
-			"text": "PIN",
+		"SendETHConfirmScreen": {
+			"text": "Confirm Send:\nAmount: {{eth_amount}} ETH\nTo: {{recipient_address}}\nFee: {{gas_fee}} ETH\n\n1. Confirm\n2. Cancel",
+			"screen_type": "Menu",
+			"menu_items": {
+				"ConfirmOption": {
+					"option": "1",
+					"display_name": "Confirm",
+					"next_screen": "SendETHPINScreen"
+				},
+				"CancelOption": {
+					"option": "2",
+					"display_name": "Cancel",
+					"next_screen": "MainScreen"
+				}
+			},
+			"default_next_screen": "MainScreen"
+		},
+		"SendETHPINScreen": {
+			"text": "Enter your PIN to authorize transaction:",
 			"screen_type": "Input",
-			"input_identifier": "pin",
-			"default_next_screen": "CancelTXScreen"
+			"input_identifier": "user_pin",
+			"default_next_screen": "SendETHProcessScreen"
 		},
-        "CancelTXScreen": {
-			"text": "SENDING  2,622.36 ETH  to +10000.....,\ntransaction cost 3. Reply ANY INPUT to\ncancel transaction.",
-			"screen_type": "Input",
-			"input_identifier": "canceltx",
-			"default_next_screen": "CancelTXFxScreen"
-		},
-		"CancelTXFxScreen": {
-			"text": "Processing...",
+		"SendETHProcessScreen": {
+			"text": "Processing transaction...\nPlease wait.",
 			"screen_type": "Function",
-			"function": "validate_canceltx",
+			"function": "process_send_eth",
 			"default_next_screen": "SendETHRouterScreen"
 		},
 		"SendETHRouterScreen": {
-			"text": "Selecting...",
+			"text": "Selecting result...",
 			"screen_type": "Router",
-			"router": "SendETHScreen",
 			"router_options": [
 				{
-					"router_option": "{{airtime.status == 'success'}}",
-					"next_screen": "SuccessScreen"
+					"router_option": "{{send_eth.status == 'success'}}",
+					"next_screen": "SendETHSuccessScreen"
 				},
 				{
-					"router_option": "{{airtime.status == 'failed'}}",
-					"next_screen": "FailureScreen"
+					"router_option": "{{send_eth.status == 'failed'}}",
+					"next_screen": "SendETHFailureScreen"
 				},
 				{
-					"router_option": "{{airtime.status == 'error'}}",
-					"next_screen": "FailureScreen"
+					"router_option": "{{send_eth.status == 'error'}}",
+					"next_screen": "SendETHFailureScreen"
 				}
 			],
 			"default_next_screen": "DefaultNoneScreen"
 		},
-		"SuccessScreen": {
-			"text": "Transaction Successful {{airtime.message}}",
+		"SendETHSuccessScreen": {
+			"text": "✓ ETH sent successfully!\nTx Hash: {{tx_hash}}\nAmount: {{eth_amount}} ETH\nFee: {{gas_fee}} ETH",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
-		"FailureScreen": {
-			"text": "Transaction Failed {{airtime.message}}",
+		"SendETHFailureScreen": {
+			"text": "✗ Transaction failed\nReason: {{error_message}}\n\nPlease try again.",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
-		"BalanceInquiryScreen": {
-			"text": "Select Account",
-			"screen_type": "Menu",
-			"default_next_screen": "MainScreen",
-			"menu_items": {
-				"SavingsOption": {
-					"option": "1",
-					"display_name": "Savings",
-					"next_screen": "MainScreen"
-				},
-				"CurrentOption": {
-					"option": "2",
-					"display_name": "Current",
-					"next_screen": "MainScreen"
-				}
-			}
+		"BalanceScreen": {
+			"text": "Processing balance check...",
+			"screen_type": "Function",
+			"function": "check_balance",
+			"default_next_screen": "BalanceDisplayScreen"
 		},
-		"SendMoneyScreen": {
-			"text": "Select option",
+		"BalanceDisplayScreen": {
+			"text": "Account Balance:\n{{balance}} ETH\n\nPress any key to continue",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"AccountScreen": {
+			"text": "My Account\n1. View Address\n2. Transaction History\n3. Settings\n0. Back",
 			"screen_type": "Menu",
-			"default_next_screen": "MainScreen",
 			"menu_items": {
-				"OwnAccountOption": {
+				"ViewAddressOption": {
 					"option": "1",
-					"display_name": "Own Account",
-					"next_screen": "MainScreen"
+					"display_name": "View Address",
+					"next_screen": "ViewAddressScreen"
 				},
-				"OtherAccountOption": {
+				"HistoryOption": {
 					"option": "2",
-					"display_name": "Other Account",
+					"display_name": "Transaction History",
+					"next_screen": "HistoryScreen"
+				},
+				"SettingsOption": {
+					"option": "3",
+					"display_name": "Settings",
+					"next_screen": "SettingsScreen"
+				},
+				"BackOption": {
+					"option": "0",
+					"display_name": "Back",
 					"next_screen": "MainScreen"
 				}
-			}
+			},
+			"default_next_screen": "MainScreen"
+		},
+		"ViewAddressScreen": {
+			"text": "Your ETH Address:\n{{wallet_address}}\n\nPress any key to continue",
+			"screen_type": "Quit",
+			"default_next_screen": "AccountScreen"
+		},
+		"SwapScreen": {
+			"text": "Coming soon...",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"WithdrawScreen": {
+			"text": "Coming soon...",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
 		},
 		"AirtimeScreen": {
-			"text": "Select option",
-			"screen_type": "Menu",
-			"default_next_screen": "MainScreen",
-			"menu_items": {
-				"OwnNumberOption": {
-					"option": "1",
-					"display_name": "Own Number",
-					"next_screen": "OwnNumberAmountScreen"
-				},
-				"OtherNumberOption": {
-					"option": "2",
-					"display_name": "Other Number",
-					"next_screen": "OtherNumberPhoneScreen"
-				}
-			}
-		},
-		"OtherNumberPhoneScreen": {
-			"text": "Enter phone number",
-			"screen_type": "Input",
-			"input_identifier": "phone_number",
-			"default_next_screen": "OtherNumberAmountScreen"
-		},
-		"OtherNumberAmountScreen": {
-			"text": "Enter amount",
-			"screen_type": "Input",
-			"input_identifier": "amount",
-			"default_next_screen": "OtherNumberFunctionScreen"
-		},
-		"OtherNumberFunctionScreen": {
-			"text": "Processing...",
-			"screen_type": "Function",
-			"function": "buy_airtime",
-			"default_next_screen": "OtherNumberRouterScreen"
-		},
-		"OtherNumberRouterScreen": {
-			"text": "Selecting...",
-			"screen_type": "Router",
-			"router": "AirtimeScreen",
-			"router_options": [
-				{
-					"router_option": "{{airtime.status == 'success'}}",
-					"next_screen": "SuccessScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'failed'}}",
-					"next_screen": "FailureScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'error'}}",
-					"next_screen": "FailureScreen"
-				}
-			],
-			"default_next_screen": "DefaultNoneScreen"
-		},
-		"OwnNumberAmountScreen": {
-			"text": "Enter amount",
-			"screen_type": "Input",
-			"input_identifier": "amount",
-			"default_next_screen": "OwnNumberFunctionScreen"
-		},
-		"OwnNumberFunctionScreen": {
-			"text": "Processing...",
-			"screen_type": "Function",
-			"function": "buy_airtime",
-			"default_next_screen": "OwnNumberRouterScreen"
-		},
-		"OwnNumberRouterScreen": {
-			"text": "Selecting...",
-			"screen_type": "Router",
-			"router": "AirtimeScreen",
-			"router_options": [
-				{
-					"router_option": "{{airtime.status == 'success'}}",
-					"next_screen": "SuccessScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'failed'}}",
-					"next_screen": "FailureScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'error'}}",
-					"next_screen": "FailureScreen"
-				}
-			],
-			"default_next_screen": "DefaultNoneScreen"
-		},
-		"SuccessScreen": {
-			"text": "Transaction Successful {{airtime.message}}",
+			"text": "Coming soon...",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
-		"FailureScreen": {
-			"text": "Transaction Failed {{airtime.message}}",
+		"HistoryScreen": {
+			"text": "Coming soon...",
 			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
+			"default_next_screen": "AccountScreen"
+		},
+		"SettingsScreen": {
+			"text": "Coming soon...",
+			"screen_type": "Quit",
+			"default_next_screen": "AccountScreen"
 		}
 	},
 	"services": {
-		"buy_airtime": {
-			"function_name": "buy_airtime",
-			"function_url": "http://localhost:3000/buy_airtime",
-			"data_key": "airtime"
+		"process_send_eth": {
+			"function_name": "process_send_eth",
+			"function_url": "http://localhost:3000/send_eth",
+			"data_key": "send_eth"
+		},
+		"check_balance": {
+			"function_name": "check_balance",
+			"function_url": "http://localhost:3000/check_balance",
+			"data_key": "balance"
 		}
 	}
 }

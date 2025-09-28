@@ -2,7 +2,156 @@ use dotenv::dotenv;
 use std::{env, net::SocketAddr};
 use axum::{
     extract::Form,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, R    // Respond in text/plain (required by Africa's Talking)
+    ([(axum::http::header::CONTENT_TYPE, "text/plain")], reply_text).into_response()
+}
+
+async fn handle_user_input(client: &Client, token: &str, session_id: &str, input: &str) -> Result<(), String> {
+    // Get current session state
+    let sql_query = format!(
+        "SELECT current_screen FROM ussd_session WHERE session_id = '{}';",
+        session_id
+    );
+    
+    let spacetime_sql_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/sql";
+    
+    let response = client.post(&spacetime_sql_url)
+        .bearer_auth(token)
+        .header("Content-Type", "text/plain")
+        .body(sql_query)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    
+    if let Ok(json) = serde_json::from_str::<Value>(&body) {
+        if let Some(current_screen) = json
+            .get(0)
+            .and_then(|v| v.get("rows"))
+            .and_then(|rows| rows.get(0))
+            .and_then(|row| row.get(0))
+            .and_then(|v| v.as_str())
+        {
+            // Handle input based on current screen
+            match current_screen {
+                "SendETHAmountScreen" => {
+                    // Update session with ETH amount
+                    update_session_field(client, token, session_id, "eth_amount", input).await?;
+                },
+                "SendETHRecipientScreen" => {
+                    // Update session with recipient address
+                    update_session_field(client, token, session_id, "recipient_address", input).await?;
+                },
+                "SendETHPINScreen" => {
+                    // Validate PIN and process transaction
+                    if input.len() >= 4 {
+                        call_process_send_eth(client, token, session_id).await?;
+                    }
+                },
+                _ => {
+                    // Handle menu navigation
+                    println!("Menu input {} for screen {}", input, current_screen);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+async fn update_session_field(client: &Client, token: &str, session_id: &str, field: &str, value: &str) -> Result<(), String> {
+    let spacetime_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/call/update_send_eth_session";
+    
+    let payload = serde_json::json!({
+        "session_id": session_id,
+        "field": field,
+        "value": value
+    });
+    
+    let response = client.post(&spacetime_url)
+        .bearer_auth(token)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Failed to update session field: {}", response.status()));
+    }
+    
+    println!("Updated session {} field {} with value {}", session_id, field, "***");
+    Ok(())
+}
+
+async fn call_process_send_eth(client: &Client, token: &str, session_id: &str) -> Result<(), String> {
+    let spacetime_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/call/process_send_eth";
+    
+    let payload = serde_json::json!({
+        "session_id": session_id
+    });
+    
+    let response = client.post(&spacetime_url)
+        .bearer_auth(token)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    if !response.status().is_success() {
+        return Err(format!("Failed to process send ETH: {}", response.status()));
+    }
+    
+    println!("Processed send ETH for session {}", session_id);
+    Ok(())
+}
+
+async fn process_template_variables(text: &str, session_id: &str, client: &Client, token: &str) -> String {
+    // Simple template variable replacement
+    let mut processed = text.to_string();
+    
+    // Replace common variables with session data
+    if processed.contains("{{") {
+        // Get session data
+        let sql_query = format!(
+            "SELECT pending_amount, pending_recipient FROM ussd_session WHERE session_id = '{}';",
+            session_id
+        );
+        
+        let spacetime_sql_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/sql";
+        
+        if let Ok(response) = client.post(&spacetime_sql_url)
+            .bearer_auth(token)
+            .header("Content-Type", "text/plain")
+            .body(sql_query)
+            .send()
+            .await
+        {
+            if let Ok(body) = response.text().await {
+                if let Ok(json) = serde_json::from_str::<Value>(&body) {
+                    if let Some(row) = json
+                        .get(0)
+                        .and_then(|v| v.get("rows"))
+                        .and_then(|rows| rows.get(0))
+                    {
+                        if let (Some(amount), Some(recipient)) = (
+                            row.get(0).and_then(|v| v.as_str()),
+                            row.get(1).and_then(|v| v.as_str()),
+                        ) {
+                            processed = processed.replace("{{eth_amount}}", amount);
+                            processed = processed.replace("{{recipient_address}}", recipient);
+                            processed = processed.replace("{{gas_fee}}", "0.000420"); // Mock gas fee
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    processed
+}
+
+// --- Main server ---se},
     routing::post,
     Router,
     Json,
@@ -30,6 +179,8 @@ struct UssdRequest {
 // --- Handler ---
 #[allow(dead_code)]
 async fn ussd_handler(Form(payload): Form<UssdRequest>) -> Response {
+    println!("Received USSD request: {:?}", payload);
+    
     // Build JSON payload for SpaceTimeDB reducer
     let json_payload = serde_json::json!({
         "sessionId": payload.session_id,
@@ -40,17 +191,44 @@ async fn ussd_handler(Form(payload): Form<UssdRequest>) -> Response {
     });
 
     let mut reply_text: String = "END Service unavailable".to_string();
+    let mut response_prefix = "CON"; // Continue session by default
 
-        // Call SpaceTimeDB reducer over HTTP (assuming reducer is exposed at /call/handle_ussd)
     let client = Client::new();
-    //let spacetime_url = "http://127.0.0.1:3000/v1/database/gateway/call/handle_ussd"; // adjust for your SpacetimeDB instance
-    //let spacetime_sql_url = "http://127.0.0.1:3000/v1/database/gateway/sql";
+    let spacetime_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/call/handle_ussd";
+    let spacetime_sql_url = std::env::var("SPACETIME_API_URL").unwrap_or_else(|_| "http://localhost:3000/v1/database/stk2eth".to_string()) + "/sql";
+    let token = std::env::var("SPACETIME_AUTH_TOKEN").unwrap_or_else(|_| "".to_string());
 
-    let spacetime_url = std::env::var("SPACETIME_API_URL").unwrap() + "/call/handle_ussd";
-    let spacetime_sql_url = std::env::var("SPACETIME_API_URL").unwrap() + "/sql";
-    let token = std::env::var("SPACETIME_AUTH_TOKEN").unwrap();
+    // Step 1: Call handle_ussd reducer to process the USSD request
+    let response = client.post(&spacetime_url)
+        .bearer_auth(&token)
+        .json(&json_payload)
+        .send()
+        .await;
 
-    let _response = client.post(spacetime_url).json(&json_payload).send().await;
+    match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                println!("Successfully called handle_ussd reducer");
+            } else {
+                println!("Failed to call handle_ussd reducer: {}", resp.status());
+            }
+        },
+        Err(e) => {
+            println!("Error calling handle_ussd reducer: {}", e);
+            return ([(axum::http::header::CONTENT_TYPE, "text/plain")], "END Service temporarily unavailable").into_response();
+        }
+    }
+
+    // Step 2: Handle different screen types and user input
+    let user_input = payload.text.split('*').last().unwrap_or("").trim();
+    
+    // Step 3: Update session based on user input and current screen
+    if !user_input.is_empty() {
+        let session_update_result = handle_user_input(&client, &token, &payload.session_id, user_input).await;
+        if let Err(e) = session_update_result {
+            println!("Error updating session: {}", e);
+        }
+    }
 
     let sql_query = format!(
         "SELECT s.text \
