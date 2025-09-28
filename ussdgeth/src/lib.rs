@@ -515,9 +515,3 @@ pub fn handle_ussd(ctx: &ReducerContext, session_id: String, phone_number: Strin
 }
 
 
-// Stub reducer for send_eth — real implementation to be provided in the contracts workstream
-#[spacetimedb::reducer]
-pub fn send_eth(ctx: &ReducerContext, to: String, amount: String) {
-    log::info!("stub send_eth called by {:?}: to={}, amount={}", ctx.sender, to, amount);
-    // For now we just log and return. The real reducer will perform signing/sending.
-}
