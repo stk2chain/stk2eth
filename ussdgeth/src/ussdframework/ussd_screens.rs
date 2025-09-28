@@ -38,10 +38,6 @@ impl fmt::Display for ScreenType {
 }
 
 impl ScreenType {
-    pub fn to_string(&self) -> String {
-        format!("{}", self)
-    }
-
     pub fn from_string(screen_type: &str) -> ScreenType {
         match screen_type {
             "Initial" => ScreenType::Initial,
