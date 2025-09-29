@@ -1,14 +1,14 @@
-use spacetimedb::{ReducerContext, reducer};
-use crate::{Swap, USSDSession, ussd_session, swap};
+use crate::{swap, ussd_session, Swap, USSDSession};
 use crate::{SwapStatus, SwapType};
 use spacetimedb::Table;
+use spacetimedb::{reducer, ReducerContext};
 
 /// Validates Ethereum address format
 fn is_valid_eth_address(address: &str) -> bool {
     // Basic validation: starts with 0x and has 42 characters total
-    address.starts_with("0x") && 
-    address.len() == 42 && 
-    address[2..].chars().all(|c| c.is_ascii_hexdigit())
+    address.starts_with("0x")
+        && address.len() == 42
+        && address[2..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
 /// Validates amount string can be parsed as positive decimal
@@ -34,15 +34,15 @@ pub fn send_eth(
     if !is_valid_eth_address(&from_address) {
         panic!("Invalid from address format");
     }
-    
+
     if !is_valid_eth_address(&to_address) {
         panic!("Invalid to address format");
     }
-    
+
     if let Err(e) = is_valid_amount(&amount) {
         panic!("Invalid amount: {}", e);
     }
-    
+
     // Find and validate session exists
     let session = match ctx.db.ussd_session().session_id().find(session_id.clone()) {
         Some(s) => s,
@@ -50,7 +50,7 @@ pub fn send_eth(
             panic!("Session not found: {}", session_id);
         }
     };
-    
+
     // Create Swap transaction (Send ETH is modeled as ETH->ETH swap)
     let swap = Swap {
         id: 0, // auto-increment
@@ -64,16 +64,16 @@ pub fn send_eth(
         tx_hash: None,
         gas_price: None,
         gas_limit: Some("21000".to_string()), // Standard ETH transfer gas limit
-        nonce: None, // Will be set by blockchain client
+        nonce: None,                          // Will be set by blockchain client
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         error_message: None,
         swap_type: SwapType::SendEth,
     };
-    
+
     // Insert the swap transaction
     let _ = ctx.db.swap().insert(swap);
-    
+
     // Update session state to show transaction is processing
     let updated_session = USSDSession {
         current_screen: "transaction_processing".to_string(),
@@ -85,11 +85,14 @@ pub fn send_eth(
         last_interaction_time: ctx.timestamp,
         ..session
     };
-    
+
     ctx.db.ussd_session().session_id().update(updated_session);
-    
+
     log::info!(
-        "Created ETH send transaction: {} ETH from {} to {} for session {}", 
-        amount, from_address, to_address, session_id
+        "Created ETH send transaction: {} ETH from {} to {} for session {}",
+        amount,
+        from_address,
+        to_address,
+        session_id
     );
 }

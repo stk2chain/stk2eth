@@ -228,23 +228,20 @@
 				}
 			],
 			"default_next_screen": "DefaultNoneScreen"
-		},
-		"SuccessScreen": {
-			"text": "Transaction Successful {{airtime.message}}",
-			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
-		},
-		"FailureScreen": {
-			"text": "Transaction Failed {{airtime.message}}",
-			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
 		}
-	},
+
+	}
+	,
 	"services": {
 		"buy_airtime": {
 			"function_name": "buy_airtime",
 			"function_url": "http://localhost:3000/buy_airtime",
 			"data_key": "airtime"
+		},
+		"send_eth": {
+			"function_name": "send_eth",
+			"function_url": null,
+			"data_key": "send_eth"
 		}
 	}
 }
