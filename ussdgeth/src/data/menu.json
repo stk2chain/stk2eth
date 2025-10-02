@@ -160,42 +160,39 @@
 			"screen_type": "Quit",
 			"default_next_screen": "AccountScreen"
 		},
-		"SwapScreen": {
-			"text": "Coming soon...",
-			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
-		},
-		"WithdrawScreen": {
-			"text": "Coming soon...",
-			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
-		},
-		"AirtimeScreen": {
-			"text": "Coming soon...",
-			"screen_type": "Quit",
-			"default_next_screen": "MainScreen"
-		},
-		"HistoryScreen": {
-			"text": "Coming soon...",
-			"screen_type": "Quit",
-			"default_next_screen": "AccountScreen"
-		},
-		"SettingsScreen": {
-			"text": "Coming soon...",
-			"screen_type": "Quit",
-			"default_next_screen": "AccountScreen"
+		"OwnNumberRouterScreen": {
+			"text": "Selecting...",
+			"screen_type": "Router",
+			"router": "AirtimeScreen",
+			"router_options": [
+				{
+					"router_option": "{{airtime.status == 'success'}}",
+					"next_screen": "SuccessScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'failed'}}",
+					"next_screen": "FailureScreen"
+				},
+				{
+					"router_option": "{{airtime.status == 'error'}}",
+					"next_screen": "FailureScreen"
+				}
+			],
+			"default_next_screen": "DefaultNoneScreen"
 		}
-	},
+
+	}
+	,
 	"services": {
-		"process_send_eth": {
-			"function_name": "process_send_eth",
-			"function_url": "http://localhost:3000/send_eth",
-			"data_key": "send_eth"
+		"buy_airtime": {
+			"function_name": "buy_airtime",
+			"function_url": "http://localhost:3000/buy_airtime",
+			"data_key": "airtime"
 		},
-		"check_balance": {
-			"function_name": "check_balance",
-			"function_url": "http://localhost:3000/check_balance",
-			"data_key": "balance"
+		"send_eth": {
+			"function_name": "send_eth",
+			"function_url": null,
+			"data_key": "send_eth"
 		}
 	}
 }

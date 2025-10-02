@@ -1,5 +1,3 @@
-use dotenv::dotenv;
-use std::{env, net::SocketAddr};
 use axum::{
     extract::Form,
     response::{IntoResponse, R    // Respond in text/plain (required by Africa's Talking)
@@ -153,14 +151,14 @@ async fn process_template_variables(text: &str, session_id: &str, client: &Clien
 
 // --- Main server ---se},
     routing::post,
-    Router,
-    Json,
+    Json, Router,
 };
+use dotenv::dotenv;
 use serde::Deserialize;
+use std::{env, net::SocketAddr};
 // use tokio::net::TcpListener;
 use reqwest::Client;
 use serde_json::Value;
-
 
 // --- Form payload from Africa's Talking ---
 #[allow(dead_code)]
@@ -172,9 +170,6 @@ struct UssdRequest {
     network_code: String,
     text: String,
 }
-
-
-
 
 // --- Handler ---
 #[allow(dead_code)]
@@ -239,14 +234,13 @@ async fn ussd_handler(Form(payload): Form<UssdRequest>) -> Response {
         payload.session_id
     );
 
-
-    let rpl = client.post(spacetime_sql_url)
-    .bearer_auth(token) // load from creds
-    .header("Content-Type", "text/plain") // 👈 tell it this is raw SQL
-    .body(sql_query) // 👈 just the SQL text
-    .send()
-    .await;
-
+    let rpl = client
+        .post(spacetime_sql_url)
+        .bearer_auth(token) // load from creds
+        .header("Content-Type", "text/plain") // 👈 tell it this is raw SQL
+        .body(sql_query) // 👈 just the SQL text
+        .send()
+        .await;
 
     // let rply = rpl.unwrap();
     let body = rpl.unwrap().text().await.unwrap();
@@ -255,18 +249,22 @@ async fn ussd_handler(Form(payload): Form<UssdRequest>) -> Response {
 
     if let Ok(json) = serde_json::from_str::<Value>(&body) {
         if let Some(row_value) = json
-        .get(0)               // outer array
-        .and_then(|v| v.get("rows"))
-        .and_then(|rows| rows.get(0)) // first row
-        .and_then(|row| row.get(0))   // first column
-        .and_then(|val| val.as_str())
-    {
-        reply_text = row_value.to_string();
-    }
+            .get(0) // outer array
+            .and_then(|v| v.get("rows"))
+            .and_then(|rows| rows.get(0)) // first row
+            .and_then(|row| row.get(0)) // first column
+            .and_then(|val| val.as_str())
+        {
+            reply_text = row_value.to_string();
+        }
     }
 
     // Respond in text/plain (required by Africa’s Talking)
-    ([(axum::http::header::CONTENT_TYPE, "text/plain")], reply_text).into_response()
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/plain")],
+        reply_text,
+    )
+        .into_response()
 }
 
 // --- Main server ---
@@ -276,10 +274,10 @@ async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
     // Read env vars
-    let spacetime_api = env::var("SPACETIME_API_URL")
-        .expect("SPACETIME_API_URL must be set in .env");
-    let spacetime_token = env::var("SPACETIME_AUTH_TOKEN")
-        .expect("SPACETIME_AUTH_TOKEN must be set in .env");
+    let spacetime_api =
+        env::var("SPACETIME_API_URL").expect("SPACETIME_API_URL must be set in .env");
+    let spacetime_token =
+        env::var("SPACETIME_AUTH_TOKEN").expect("SPACETIME_AUTH_TOKEN must be set in .env");
     let port: u16 = env::var("USSD_PORT")
         .unwrap_or_else(|_| "8080".into())
         .parse()
@@ -290,27 +288,28 @@ async fn main() -> anyhow::Result<()> {
     let _spacetime_sql_url = format!("{}/sql", spacetime_api);
 
     // Prepare HTTP client with bearer token
-    let client = Client::builder()
-        .build()?;
+    let client = Client::builder().build()?;
 
     // Example: store client & token in app state
-    let app = Router::new()
-    .route("/ussd", post(move |Json(body): Json<Value>| {
-        let client = client.clone();
-        let spacetime_url = spacetime_url.clone();
-        let spacetime_token = spacetime_token.clone();
-        async move {
-            let res = client
-                .post(&spacetime_url)
-                .bearer_auth(&spacetime_token)
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("Error: {:?}", e))?;
+    let app = Router::new().route(
+        "/ussd",
+        post(move |Json(body): Json<Value>| {
+            let client = client.clone();
+            let spacetime_url = spacetime_url.clone();
+            let spacetime_token = spacetime_token.clone();
+            async move {
+                let res = client
+                    .post(&spacetime_url)
+                    .bearer_auth(&spacetime_token)
+                    .json(&body)
+                    .send()
+                    .await
+                    .map_err(|e| format!("Error: {:?}", e))?;
 
-            Ok::<_, String>(res.text().await.unwrap_or_default())
-        }
-    }));
+                Ok::<_, String>(res.text().await.unwrap_or_default())
+            }
+        }),
+    );
 
     // Start server
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -321,4 +320,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

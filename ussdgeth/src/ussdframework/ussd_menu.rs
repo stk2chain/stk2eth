@@ -10,10 +10,7 @@ use std::collections::HashMap;
 //     ussd_service::USSDService,
 // };
 
-use crate::ussdframework::{
-    ussd_screens::USSDScreen,
-    ussd_service::USSDService,
-};
+use crate::ussdframework::{ussd_screens::USSDScreen, ussd_service::USSDService};
 
 /// Represents a USSD menu structure.
 ///
