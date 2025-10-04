@@ -20,7 +20,7 @@ pub fn log_send_eth_transaction(
     }
 
     // Check for duplicate transactions
-    let existing_logs: Vec<_> = ctx.db.eth_audit_logs().tx_hash().filter(&tx_hash).collect();
+    let existing_logs: Vec<_> = ctx.db.eth_audit_logs().iter().filter(|log| log.tx_hash == tx_hash).collect();
     if !existing_logs.is_empty() {
         log::warn!("Duplicate transaction hash detected: {}", tx_hash);
         return;
@@ -91,7 +91,7 @@ pub fn log_send_eth_transaction_with_fatf(
     }
 
     // Check for duplicate transactions
-    let existing_logs: Vec<_> = ctx.db.eth_audit_logs().tx_hash().filter(&tx_hash).collect();
+    let existing_logs: Vec<_> = ctx.db.eth_audit_logs().iter().filter(|log| log.tx_hash == tx_hash).collect();
     if !existing_logs.is_empty() {
         log::warn!("Duplicate transaction hash detected: {}", tx_hash);
         return;

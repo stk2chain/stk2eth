@@ -1,5 +1,4 @@
 use crate::{swap, ussd_session, Swap, USSDSession};
-use crate::{SwapStatus, SwapType};
 use spacetimedb::Table;
 use spacetimedb::{reducer, ReducerContext};
 
@@ -60,7 +59,7 @@ pub fn send_eth(
         amount: amount.clone(),
         token_in: "ETH".to_string(),
         token_out: "ETH".to_string(),
-        status: SwapStatus::Pending,
+        status: "Pending".to_string(),
         tx_hash: None,
         gas_price: None,
         gas_limit: Some("21000".to_string()), // Standard ETH transfer gas limit
@@ -68,7 +67,7 @@ pub fn send_eth(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         error_message: None,
-        swap_type: SwapType::SendEth,
+        swap_type: "SendEth".to_string(),
     };
 
     // Insert the swap transaction
