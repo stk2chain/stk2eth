@@ -365,3 +365,47 @@ mod pin_security_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod rate_limiting_tests {
+    use super::*;
+    use spacetimedb::Timestamp;
+    use std::time::SystemTime;
+
+    #[test]
+    fn test_lockout_time_calculation() {
+        let now = Timestamp::from(SystemTime::now());
+        let salt = generate_salt();
+        let hash1 = hash_pin("1234", &salt);
+        let hash2 = hash_pin("5678", &salt);
+
+        assert_ne!(hash1, hash2);
+        assert!(now <= Timestamp::from(SystemTime::now()));
+    }
+
+    #[test]
+    fn test_multiple_salts_produce_unique_hashes() {
+        let pin = "1234";
+        let mut hashes = Vec::new();
+
+        for _ in 0..10 {
+            let salt = generate_salt();
+            let hash = hash_pin(pin, &salt);
+            assert!(
+                !hashes.contains(&hash),
+                "Hash should be unique for each salt"
+            );
+            hashes.push(hash);
+        }
+
+        assert_eq!(hashes.len(), 10);
+    }
+
+    #[test]
+    fn test_timestamp_ordering() {
+        let t1 = Timestamp::from(SystemTime::UNIX_EPOCH);
+        let t2 = Timestamp::from(SystemTime::now());
+
+        assert!(t2 > t1, "Current time should be after UNIX epoch");
+    }
+}

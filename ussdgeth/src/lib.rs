@@ -29,6 +29,7 @@ pub struct USSDSession {
     #[unique]
     sender: Identity,
     online: bool,
+    authenticated: bool,
 }
 
 #[table(name = eth_audit_logs)]
@@ -194,6 +195,8 @@ pub struct UserPIN {
     pub salt: String,
     pub attempts: u32,
     pub locked: bool,
+    pub last_attempt_time: Option<Timestamp>,
+    pub lockout_until: Option<Timestamp>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
@@ -344,6 +347,7 @@ pub fn get_or_create_session(
             current_screen: initial_screen,
             sender: ctx.sender,
             online: true,
+            authenticated: false,
             last_interaction_time: ctx.timestamp,
             visited_screens: Vec::new(),
             end_session: false,
