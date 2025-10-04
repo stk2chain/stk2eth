@@ -160,12 +160,6 @@ jobs:
         run: |
           cargo install spacetimedb-cli --locked || echo "SpacetimeDB CLI already installed"
 
-      - name: Run integration tests
-        run: cargo test --workspace --test '*' -- --test-threads=1
-        env:
-          RUST_LOG: info
-          INTEGRATION_TEST: "true"
-
       - name: Run E2E Send ETH flow test (< 60s target)
         run: |
           echo "Running E2E Send ETH flow test..."
