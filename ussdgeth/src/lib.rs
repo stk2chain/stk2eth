@@ -1,6 +1,7 @@
 mod ussdframework;
 mod audit_tests;
 mod audit_reducers;
+mod swap_tests;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 

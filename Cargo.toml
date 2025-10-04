@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "ussdgeth",
-    "ussdclient", 
+    "ussdclient",
     "ethclient"
 ]
 resolver = "2"
