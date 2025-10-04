@@ -2,8 +2,8 @@
 
 # Mobile ETH Specifications
 
-[![CI/CD Pipeline](https://github.com/stk2chain/stk2eth/workflows/CI%2FCD%20Pipeline%20-%20STK2ETH/badge.svg)](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml)
-[![Deploy to DigitalOcean](https://github.com/stk2chain/stk2eth/workflows/Deploy%20to%20DigitalOcean/badge.svg)](https://github.com/stk2chain/stk2eth/actions/workflows/deploy.yml)
+[![CI/CD Pipeline](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml/badge.svg)](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml)
+[![Deploy to DigitalOcean](https://github.com/stk2chain/stk2eth/actions/workflows/deploy.yml/badge.svg)](https://github.com/stk2chain/stk2eth/actions/workflows/deploy.yml)
 [![codecov](https://codecov.io/gh/stk2chain/stk2eth/branch/develop/graph/badge.svg)](https://codecov.io/gh/stk2chain/stk2eth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust Version](https://img.shields.io/badge/rust-1.83%2B-blue.svg)](https://www.rust-lang.org)
