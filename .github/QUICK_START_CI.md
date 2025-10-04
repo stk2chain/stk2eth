@@ -151,11 +151,11 @@ git add . && git commit -m "fix: Fix failing tests" && git push
 RUST_LOG=debug cargo test --test integration_send_eth -- send_eth_flow_test
 ```
 
-## 🔍 Monitoring & Badges
+## Monitoring & Badges
 
 ### Status Badges
 
-Add to your PR description:
+Add to PR description:
 
 ```markdown
 [![CI](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml/badge.svg?branch=your-branch)](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml)
@@ -167,29 +167,29 @@ Add to your PR description:
 - Or go to Actions tab → Select workflow run
 - Click on failed job to see logs
 
-## 🎓 Best Practices
+## Best Practices
 
 ### Before Creating PR:
 
-1. ✅ Run `make verify` locally
-2. ✅ Ensure all tests pass
-3. ✅ Check that formatting is correct
-4. ✅ Run security audit
+1. Run `make verify` locally
+2. Ensure all tests pass
+3. Check that formatting is correct
+4. Run security audit
 
 ### During PR Review:
 
-1. ✅ Monitor CI results
-2. ✅ Fix any failures immediately
-3. ✅ Check coverage hasn't decreased
-4. ✅ Verify E2E test is < 60s
+1. Monitor CI results
+2. Fix any failures immediately
+3. Check coverage hasn't decreased
+4. Verify E2E test is < 60s
 
 ### After PR Merge:
 
-1. ✅ Verify staging deployment succeeded
-2. ✅ Run smoke tests on staging
-3. ✅ Monitor for any issues
+1. Verify staging deployment succeeded
+2. Run smoke tests on staging
+3. Monitor for any issues
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### CI is not running
 
@@ -215,19 +215,15 @@ Add to your PR description:
 - Add proper waits/timeouts in integration tests
 - Mock external dependencies
 
-## 📚 Further Reading
+## Further Reading
 
 - [Full CI Setup Guide](.github/CI_SETUP.md)
 - [Implementation Summary](.github/CI_IMPLEMENTATION_SUMMARY.md)
 - [Contributing Guidelines](../CONTRIBUTING.md)
 
-## 🆘 Need Help?
+## Need Help?
 
 1. Check workflow logs for error details
 2. Review [CI_SETUP.md](CI_SETUP.md) for configuration
 3. Open an issue with `ci` label
 4. Tag maintainers for urgent issues
-
----
-
-**Ready to go!** Push your code and watch the magic happen! 🎉
