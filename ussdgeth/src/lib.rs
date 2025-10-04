@@ -1,5 +1,7 @@
 #[derive(Clone, PartialEq, Debug)]
+#[table(name = ussd_service)]
 pub struct USSDServiceRow {
+    #[primary_key]
     pub id: u64,
     pub ussd_menu: u64,
     pub name: String,
@@ -38,16 +40,14 @@ pub struct EthAuditLog {
     pub risk_score: Option<u32>,
     pub is_immutable: bool,
 }
-mod ussdframework;
-mod audit_tests;
 mod audit_reducers;
-pub(crate) mod mock_context;
+mod audit_tests;
+mod ussdframework;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, Table, Timestamp};
 
 use anyhow::Result;
 use ussdframework::USSDMenu;
-use ussdframework::ussd_screens::USSDScreen;
 mod reducers;
 pub use reducers::send_eth::send_eth;
 
@@ -64,7 +64,6 @@ pub struct USSDSession {
     current_screen: String,
     visited_screens: Vec<String>,
     last_interaction_time: Timestamp,
-
 
     end_session: bool,
     #[unique]
@@ -96,8 +95,6 @@ pub struct Swap {
     pub swap_type: String,
 }
 
-
-
 #[table(name = ussd_request)]
 pub struct USSDRequest {
     #[primary_key]
@@ -126,7 +123,10 @@ pub fn init(ctx: &ReducerContext) {
 
     for (name, service) in menu_screens.services.into_iter() {
         if service.function_name.trim().is_empty() || service.data_key.trim().is_empty() {
-            log::warn!("Skipping service {} due to missing function_name or data_key", name);
+            log::warn!(
+                "Skipping service {} due to missing function_name or data_key",
+                name
+            );
             continue;
         }
         // Skipped: logic using ctx.db.ussd_service() which is not available in production reducers.
@@ -142,9 +142,16 @@ pub fn identity_connected(ctx: &ReducerContext) {
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
     if let Some(session_retrieved) = ctx.db.ussd_session().sender().find(ctx.sender) {
-        log::info!("Processing USSD for session: {}", session_retrieved.session_id);
+        log::info!(
+            "Processing USSD for session: {}",
+            session_retrieved.session_id
+        );
     } else {
-        log::warn!("Disconnect event for unknown user with identity {:?}@{:?}", ctx.sender, ctx.timestamp);
+        log::warn!(
+            "Disconnect event for unknown user with identity {:?}@{:?}",
+            ctx.sender,
+            ctx.timestamp
+        );
     }
 }
 
@@ -198,7 +205,10 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, _text: String) {
     let _session = match ctx.db.ussd_session().session_id().find(session_id.clone()) {
         Some(s) => s,
         None => {
-            log::error!("execute_screen failed: Session not found for {}", session_id);
+            log::error!(
+                "execute_screen failed: Session not found for {}",
+                session_id
+            );
             return;
         }
     };
@@ -218,19 +228,19 @@ pub fn handle_ussd(
     // Skipped: logic using ctx.db.ussd_menu() which is not available in production reducers.
     let initial_screen = get_initial_screen(ctx);
 
-        get_or_create_session(
-            ctx,
-            session_id.clone(),
-            phone_number,
-            network_code,
-            service_code,
-            text.clone(),
-            initial_screen,
-        );
+    get_or_create_session(
+        ctx,
+        session_id.clone(),
+        phone_number,
+        network_code,
+        service_code,
+        text.clone(),
+        initial_screen,
+    );
 
-        execute_screen(ctx, session_id, text);
+    execute_screen(ctx, session_id, text);
 
-        // If you need to use initial_screen, add logic here.
+    // If you need to use initial_screen, add logic here.
 }
 
 // --- Feature: Session Cleanup Reducer (feat #12) ---

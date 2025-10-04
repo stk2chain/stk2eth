@@ -27,7 +27,6 @@ impl fmt::Display for ScreenType {
     }
 }
 
-
 // Define structure for a screen
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct USSDScreen {
