@@ -48,33 +48,39 @@ This document describes the continuous integration and deployment pipeline for S
 Configure these secrets in GitHub repository settings:
 
 ### SpacetimeDB Secrets
+
 - `SPACETIME_TOKEN`: Authentication token for SpacetimeDB CLI
 - `SPACETIME_STAGING_SERVER`: Staging server hostname (e.g., `testnet`)
 - `SPACETIME_DB_ID`: Database identifier for reducer calls
 
 ### Coverage Secrets
+
 - `CODECOV_TOKEN`: Token for uploading coverage reports to Codecov
 
 ## Success Criteria
 
 ### 1. Code Quality
-- ✅ All code must pass `cargo fmt --check`
-- ✅ All code must pass `cargo clippy` with zero warnings
-- ✅ No security vulnerabilities in dependencies
+
+- All code must pass `cargo fmt --check`
+- All code must pass `cargo clippy` with zero warnings
+- No security vulnerabilities in dependencies
 
 ### 2. Testing
-- ✅ 100% of unit tests must pass
-- ✅ All integration tests must pass
-- ✅ E2E test must complete in < 60 seconds
-- ✅ Stress test success rate ≥ 95%
+
+- 100% of unit tests must pass
+- All integration tests must pass
+- E2E test must complete in < 60 seconds
+- Stress test success rate ≥ 95%
 
 ### 3. Build
-- ✅ All workspace members must build successfully
-- ✅ Release builds must complete without errors
+
+- All workspace members must build successfully
+- Release builds must complete without errors
 
 ### 4. Coverage
-- 🎯 Target: ≥ 70% code coverage
-- 📊 Coverage reports uploaded to Codecov
+
+- Target: ≥ 70% code coverage
+- Coverage reports uploaded to Codecov
 
 ## Local Testing
 
@@ -107,6 +113,7 @@ cargo build --release --workspace
 ```
 
 ### Quick local verification:
+
 ```bash
 make verify
 ```
@@ -114,23 +121,27 @@ make verify
 ## Performance Benchmarks
 
 ### Target Metrics
+
 - **Unit Tests**: Complete in < 5 minutes
 - **Integration Tests**: Complete in < 10 minutes
 - **Stress Tests**: Complete in < 5 minutes
 - **Full Pipeline**: Complete in < 20 minutes
-- **E2E Test**: Complete in < 60 seconds ⚠️ **Critical**
+- **E2E Test**: Complete in < 60 seconds **Critical**
 
 ### Actual Metrics (Updated per run)
+
 See GitHub Actions workflow run history for current metrics.
 
 ## Stress Test Configuration
 
 ### Environment Variables
+
 - `CONCURRENT_SESSIONS`: Number of concurrent swap sessions (default: 100)
 - `TEST_DURATION`: Duration of sustained load test in seconds (default: 30)
 - `INTEGRATION_TEST`: Set to "true" to run integration tests
 
 ### Stress Test Scenarios
+
 1. **Concurrent Sessions**: Tests 100 simultaneous swap operations
 2. **Sustained Load**: Continuous swap operations for 30 seconds
 3. **Race Conditions**: 50 iterations of rapid state transitions
@@ -140,27 +151,32 @@ See GitHub Actions workflow run history for current metrics.
 ## Caching Strategy
 
 ### Cargo Cache
+
 - Registry index and cache
 - Git database
 - Target directory
 
 ### Foundry Cache
+
 - Forge cache directory
 - Contract build artifacts
 
 ### Cache Keys
+
 - Primary: `${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}`
 - Restore: `${{ runner.os }}-cargo-`
 
 ## Deployment
 
 ### Staging Deployment
+
 - **Trigger**: Push to `develop` branch
 - **Target**: SpacetimeDB staging environment
 - **Database**: `stk2eth-staging`
 - **Notification**: Console output with deployment URL
 
 ### Production Deployment
+
 - **Manual trigger required** via GitHub Actions UI
 - Requires approval from repository maintainer
 
@@ -169,30 +185,39 @@ See GitHub Actions workflow run history for current metrics.
 ### Common Issues
 
 #### 1. Test Timeout
+
 ```
 Error: E2E test exceeded 60s timeout
 ```
+
 **Solution**: Optimize reducers or increase timeout threshold
 
 #### 2. Clippy Warnings
+
 ```
 Error: clippy found warnings
 ```
+
 **Solution**: Run `cargo clippy --fix` locally and commit changes
 
 #### 3. Format Check Failed
+
 ```
 Error: Diff in .github/workflows/ci.yml
 ```
+
 **Solution**: Run `cargo fmt --all` and commit changes
 
 #### 4. Stress Test Failures
+
 ```
 Error: Success rate should be >= 95%
 ```
+
 **Solution**: Check SpacetimeDB connection and reducer performance
 
 ### Getting Help
+
 - Check workflow logs in GitHub Actions
 - Review [CONTRIBUTING.md](../CONTRIBUTING.md)
 - Open an issue with `ci` label
@@ -208,11 +233,13 @@ Add these badges to your PR description:
 ## Maintenance
 
 ### Weekly Tasks
+
 - Review and update dependencies
 - Check for security advisories
 - Monitor CI performance metrics
 
 ### Monthly Tasks
+
 - Review and optimize caching strategy
 - Update stress test thresholds
 - Review code coverage trends
@@ -220,6 +247,7 @@ Add these badges to your PR description:
 ## Metrics & Monitoring
 
 Track these metrics over time:
+
 - Build duration
 - Test success rate
 - Code coverage percentage

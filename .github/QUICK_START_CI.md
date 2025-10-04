@@ -1,6 +1,6 @@
 # Quick Start: CI/CD Pipeline
 
-## 🚀 Activate Your CI Pipeline in 5 Minutes
+## Activate Your CI Pipeline in 5 Minutes
 
 ### Step 1: Configure GitHub Secrets
 
@@ -37,9 +37,9 @@ git push origin develop
 1. Go to Actions tab
 2. Click on the running workflow
 3. Watch jobs execute in parallel
-4. ✅ Wait for all checks to pass
+4. Wait for all checks to pass
 
-## ✅ Verification Checklist
+## Verification Checklist
 
 After first successful build:
 
@@ -49,23 +49,28 @@ After first successful build:
 - [ ] No security vulnerabilities found
 - [ ] Build artifacts uploaded
 
-## 🎯 What Happens on Each Push
+## What Happens on Each Push
 
 ### Automatic Checks (Every Push/PR):
+
 1. **Lint & Format** (~2 min)
+
    - Code style verification
    - Clippy linting
 
 2. **Tests** (~10 min)
+
    - Unit tests with coverage
    - Integration tests
    - Contract tests
 
 3. **Stress Tests** (~3 min)
+
    - 100 concurrent sessions
    - Performance metrics
 
 4. **Build** (~6 min)
+
    - Multi-target compilation
    - Artifact generation
 
@@ -74,10 +79,11 @@ After first successful build:
    - Vulnerability scanning
 
 ### On `develop` Branch:
+
 - All above checks PLUS
 - **Automatic deployment to staging**
 
-## 🛠️ Local Testing Before Push
+## Local Testing Before Push
 
 Save time by running checks locally:
 
@@ -94,23 +100,26 @@ cargo test --workspace --test '*'               # Integration tests (~5 min)
 CONCURRENT_SESSIONS=10 cargo test --test stress_test -- --ignored  # Stress tests (~1 min)
 ```
 
-## 📊 Understanding CI Results
+## Understanding CI Results
 
-### ✅ All Green (Success)
+### All Green (Success)
+
 ```
-✅ Lint & Format
-✅ Unit Tests
-✅ Contract Tests
-✅ Integration Tests
-✅ Stress Tests
-✅ Build
-✅ Security Audit
+Lint & Format
+Unit Tests
+Contract Tests
+Integration Tests
+Stress Tests
+Build
+Security Audit
 ```
+
 **Action**: Your PR is ready to merge!
 
-### ❌ Some Red (Failure)
+### Some Red (Failure)
 
 #### Format Check Failed
+
 ```bash
 # Fix it:
 cargo fmt --all
@@ -118,6 +127,7 @@ git add . && git commit --amend --no-edit && git push --force
 ```
 
 #### Clippy Warnings
+
 ```bash
 # Fix it:
 cargo clippy --workspace --fix --allow-dirty
@@ -125,6 +135,7 @@ git add . && git commit -m "fix: Address clippy warnings" && git push
 ```
 
 #### Test Failures
+
 ```bash
 # Debug it:
 cargo test --workspace -- --nocapture
@@ -133,6 +144,7 @@ git add . && git commit -m "fix: Fix failing tests" && git push
 ```
 
 #### E2E Timeout (> 60s)
+
 ```bash
 # This is critical - optimize your code
 # Check which operations are slow:
@@ -142,12 +154,15 @@ RUST_LOG=debug cargo test --test integration_send_eth -- send_eth_flow_test
 ## 🔍 Monitoring & Badges
 
 ### Status Badges
+
 Add to your PR description:
+
 ```markdown
 [![CI](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml/badge.svg?branch=your-branch)](https://github.com/stk2chain/stk2eth/actions/workflows/ci.yml)
 ```
 
 ### View Detailed Results
+
 - Click on the badge in README.md
 - Or go to Actions tab → Select workflow run
 - Click on failed job to see logs
@@ -155,18 +170,21 @@ Add to your PR description:
 ## 🎓 Best Practices
 
 ### Before Creating PR:
+
 1. ✅ Run `make verify` locally
 2. ✅ Ensure all tests pass
 3. ✅ Check that formatting is correct
 4. ✅ Run security audit
 
 ### During PR Review:
+
 1. ✅ Monitor CI results
 2. ✅ Fix any failures immediately
 3. ✅ Check coverage hasn't decreased
 4. ✅ Verify E2E test is < 60s
 
 ### After PR Merge:
+
 1. ✅ Verify staging deployment succeeded
 2. ✅ Run smoke tests on staging
 3. ✅ Monitor for any issues
@@ -174,21 +192,25 @@ Add to your PR description:
 ## 🚨 Troubleshooting
 
 ### CI is not running
+
 - Check that GitHub Actions is enabled
 - Verify workflow file syntax
 - Check branch protection rules
 
 ### Secrets not working
+
 - Verify secret names match exactly
 - Secrets are case-sensitive
 - Re-create secrets if unsure
 
 ### Slow CI builds
+
 - Check cache is working (see build logs)
 - Reduce parallelism if hitting rate limits
 - Consider self-hosted runners for large projects
 
 ### Flaky tests
+
 - Use `--test-threads=1` for serial execution
 - Add proper waits/timeouts in integration tests
 - Mock external dependencies
