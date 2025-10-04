@@ -1,7 +1,19 @@
 [workspace]
 members = [
     "ussdgeth",
-    "ussdclient", 
+    "ussdclient",
     "ethclient"
 ]
 resolver = "2"
+
+[package]
+name = "stk2eth"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Minimal dependencies for integration tests

@@ -73,6 +73,7 @@ impl USSDScreen {
     /// - For an input screen, the message comprises the screen text alone.
     /// - For a function screen, the message comprises the screen text alone.
     /// - For a router screen, no message is displayed.
+    #[allow(dead_code)]
     pub fn display(&self) -> Option<String> {
         let mut message = String::new();
 

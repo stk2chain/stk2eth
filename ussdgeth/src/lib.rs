@@ -1,6 +1,8 @@
-mod ussdframework;
-mod audit_tests;
 mod audit_reducers;
+mod audit_tests;
+mod pin_validation_tests;
+mod swap_tests;
+mod ussdframework;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -8,6 +10,7 @@ use anyhow::Result;
 use ussdframework::{ScreenType as FrameworkScreenType, USSDMenu as FrameworkMenu};
 mod reducers;
 pub use reducers::send_eth::send_eth;
+pub use reducers::validate_pin::validate_pin;
 
 #[table(name = ussd_session)]
 pub struct USSDSession {
@@ -26,6 +29,7 @@ pub struct USSDSession {
     #[unique]
     sender: Identity,
     online: bool,
+    authenticated: bool,
 }
 
 #[table(name = eth_audit_logs)]
@@ -182,6 +186,29 @@ pub struct USSDRequest {
     created_at: Timestamp,
 }
 
+#[table(name = user_pin)]
+pub struct UserPIN {
+    #[primary_key]
+    #[index(btree)]
+    pub phone_number: String,
+    pub pin_hash: String,
+    pub salt: String,
+    pub attempts: u32,
+    pub locked: bool,
+    pub last_attempt_time: Option<Timestamp>,
+    pub lockout_until: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum PINValidationResult {
+    Success,
+    InvalidPIN,
+    AccountLocked,
+    UserNotFound,
+}
+
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
     let content = include_str!("./data/menu.json");
@@ -193,7 +220,8 @@ pub fn init(ctx: &ReducerContext) {
         }
     };
 
-    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*4337#".to_string()) {
+    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*4337#".to_string())
+    {
         existing
     } else {
         ctx.db.ussd_menu().insert(USSDMenu {
@@ -239,7 +267,10 @@ pub fn init(ctx: &ReducerContext) {
 
     for (name, service) in menu_screens.services.into_iter() {
         if service.function_name.trim().is_empty() || service.data_key.trim().is_empty() {
-            log::warn!("Skipping service {} due to missing function_name or data_key", name);
+            log::warn!(
+                "Skipping service {} due to missing function_name or data_key",
+                name
+            );
             continue;
         }
 
@@ -271,9 +302,16 @@ pub fn identity_connected(ctx: &ReducerContext) {
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
     if let Some(session_retrieved) = ctx.db.ussd_session().sender().find(ctx.sender) {
-        log::info!("Processing USSD for session: {}", session_retrieved.session_id);
+        log::info!(
+            "Processing USSD for session: {}",
+            session_retrieved.session_id
+        );
     } else {
-        log::warn!("Disconnect event for unknown user with identity {:?}@{:?}", ctx.sender, ctx.timestamp);
+        log::warn!(
+            "Disconnect event for unknown user with identity {:?}@{:?}",
+            ctx.sender,
+            ctx.timestamp
+        );
     }
 }
 
@@ -309,6 +347,7 @@ pub fn get_or_create_session(
             current_screen: initial_screen,
             sender: ctx.sender,
             online: true,
+            authenticated: false,
             last_interaction_time: ctx.timestamp,
             visited_screens: Vec::new(),
             end_session: false,
@@ -330,15 +369,26 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
     let session = match ctx.db.ussd_session().session_id().find(session_id.clone()) {
         Some(s) => s,
         None => {
-            log::error!("execute_screen failed: Session not found for {}", session_id);
+            log::error!(
+                "execute_screen failed: Session not found for {}",
+                session_id
+            );
             return;
         }
     };
 
-    let screen_def = match ctx.db.ussd_screen().iter().find(|s| s.name == session.current_screen) {
+    let screen_def = match ctx
+        .db
+        .ussd_screen()
+        .iter()
+        .find(|s| s.name == session.current_screen)
+    {
         Some(s) => s,
         None => {
-            log::error!("execute_screen failed: Screen definition not found for {}", session.current_screen);
+            log::error!(
+                "execute_screen failed: Screen definition not found for {}",
+                session.current_screen
+            );
             return;
         }
     };
@@ -347,7 +397,9 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
         ScreenType::Function => {
             if let Some(func_name) = screen_def.function.clone() {
                 let svc_opt = ctx.db.ussd_service().iter().find(|svc| {
-                    svc.name == func_name || svc.data_key == func_name || svc.function_name == func_name
+                    svc.name == func_name
+                        || svc.data_key == func_name
+                        || svc.function_name == func_name
                 });
 
                 if let Some(svc) = svc_opt {
@@ -373,9 +425,27 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                         let from_address = "0x0000000000000000000000000000000000000000".to_string();
                         let to_address = "0x0000000000000000000000000000000000000000".to_string();
                         let amount = "0.0".to_string();
-                        send_eth(ctx, session.session_id.clone(), from_address, to_address, amount);
+                        send_eth(
+                            ctx,
+                            session.session_id.clone(),
+                            from_address,
+                            to_address,
+                            amount,
+                        );
+                    } else if svc.function_name == "validate_pin" {
+                        let pin = text.clone();
+                        validate_pin(
+                            ctx,
+                            session.session_id.clone(),
+                            session.phone_number.clone(),
+                            pin,
+                        );
                     }
-                    log::info!("Enqueued USSDRequest {} for service {}", new_req_id, svc.name);
+                    log::info!(
+                        "Enqueued USSDRequest {} for service {}",
+                        new_req_id,
+                        svc.name
+                    );
                 } else {
                     log::warn!("No service found for function {}", func_name);
                 }
@@ -416,7 +486,6 @@ pub fn handle_ussd(
         );
 
         execute_screen(ctx, session_id, text);
-
     } else {
         log::warn!("Unknown Menu serviceCode {}", service_code);
     }

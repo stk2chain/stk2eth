@@ -96,18 +96,14 @@ mod audit_log_tests {
     #[test]
     fn test_phone_number_validation() {
         // Test phone number format validation
-        let valid_phones = vec![
-            "+254712345678",
-            "+1234567890",
-            "+44123456789"
-        ];
+        let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];
 
         let invalid_phones = vec![
-            "254712345678",      // Missing +
-            "+254712345678901",  // Too long (16 chars > 15)
-            "+254abc123",        // Contains letters
-            "+254123",           // Too short (8 chars < 10)
-            ""                   // Empty
+            "254712345678",     // Missing +
+            "+254712345678901", // Too long (16 chars > 15)
+            "+254abc123",       // Contains letters
+            "+254123",          // Too short (8 chars < 10)
+            "",                 // Empty
         ];
 
         for phone in valid_phones {
@@ -125,7 +121,12 @@ mod audit_log_tests {
 
             let is_valid = has_plus && correct_length && only_digits_and_plus && not_empty;
 
-            assert!(!is_valid, "Phone '{}' (len={}) should be invalid", phone, phone.len());
+            assert!(
+                !is_valid,
+                "Phone '{}' (len={}) should be invalid",
+                phone,
+                phone.len()
+            );
         }
     }
 
@@ -133,16 +134,16 @@ mod audit_log_tests {
     fn test_transaction_amount_validation() {
         // Test transaction amount validation
         let valid_amounts = vec![
-            "1000000000000000000",    // 1 ETH in wei
-            "500000000000000000",     // 0.5 ETH
-            "1",                      // 1 wei
+            "1000000000000000000", // 1 ETH in wei
+            "500000000000000000",  // 0.5 ETH
+            "1",                   // 1 wei
         ];
 
         let invalid_amounts = vec![
-            "0",                      // Zero amount
-            "-1000000000000000000",   // Negative amount
-            "abc123",                 // Non-numeric
-            "",                       // Empty
+            "0",                    // Zero amount
+            "-1000000000000000000", // Negative amount
+            "abc123",               // Non-numeric
+            "",                     // Empty
         ];
 
         for amount in valid_amounts {
@@ -153,10 +154,10 @@ mod audit_log_tests {
 
         for amount in invalid_amounts {
             assert!(
-                amount.is_empty() ||
-                amount == "0" ||
-                amount.starts_with("-") ||
-                amount.parse::<u64>().is_err()
+                amount.is_empty()
+                    || amount == "0"
+                    || amount.starts_with("-")
+                    || amount.parse::<u64>().is_err()
             );
         }
     }
