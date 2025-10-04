@@ -125,7 +125,9 @@ mod send_eth_e2e_tests {
     }
 
     fn validate_eth_address(address: &str) -> bool {
-        address.starts_with("0x") && address.len() == 42 && address[2..].chars().all(|c| c.is_ascii_hexdigit())
+        address.starts_with("0x")
+            && address.len() == 42
+            && address[2..].chars().all(|c| c.is_ascii_hexdigit())
     }
 
     fn validate_amount(amount: &str) -> Result<f64, String> {
@@ -260,14 +262,26 @@ mod send_eth_e2e_tests {
     #[test]
     fn test_address_validation() {
         // Valid addresses
-        assert!(validate_eth_address("0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"));
-        assert!(validate_eth_address("0x0000000000000000000000000000000000000000"));
+        assert!(validate_eth_address(
+            "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"
+        ));
+        assert!(validate_eth_address(
+            "0x0000000000000000000000000000000000000000"
+        ));
 
         // Invalid addresses
-        assert!(!validate_eth_address("742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1")); // No 0x
-        assert!(!validate_eth_address("0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C")); // Too short
-        assert!(!validate_eth_address("0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C11")); // Too long
-        assert!(!validate_eth_address("0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")); // Invalid hex
+        assert!(!validate_eth_address(
+            "742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"
+        )); // No 0x
+        assert!(!validate_eth_address(
+            "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C"
+        )); // Too short
+        assert!(!validate_eth_address(
+            "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C11"
+        )); // Too long
+        assert!(!validate_eth_address(
+            "0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        )); // Invalid hex
 
         println!("✅ Address validation working correctly");
     }
@@ -384,7 +398,10 @@ mod send_eth_e2e_tests {
 
         let elapsed = start_time.elapsed();
         assert_eq!(db.swaps.len(), 100);
-        assert!(elapsed < Duration::from_secs(60), "100 swaps should complete in < 60s");
+        assert!(
+            elapsed < Duration::from_secs(60),
+            "100 swaps should complete in < 60s"
+        );
 
         println!("✅ Processed 100 swaps in {:?}", elapsed);
     }

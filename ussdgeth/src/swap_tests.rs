@@ -121,7 +121,7 @@ mod swap_state_tests {
             ("1.0", true),
             ("0.5", true),
             ("100.25", true),
-            ("0.000001", true), // Micro amounts
+            ("0.000001", true),  // Micro amounts
             ("1000000.0", true), // Large amounts
         ];
 
@@ -176,7 +176,8 @@ mod swap_state_tests {
         let mut swap = create_test_swap("test_session".to_string());
 
         // Set valid tx hash
-        swap.tx_hash = Some("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234".to_string());
+        swap.tx_hash =
+            Some("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234".to_string());
 
         let tx_hash = swap.tx_hash.unwrap();
         assert!(tx_hash.starts_with("0x"));
@@ -207,7 +208,7 @@ mod swap_state_tests {
 
         assert_eq!(swap.status, SwapStatus::Failed);
         assert!(swap.error_message.is_some());
-        assert!(swap.error_message.unwrap().len() > 0);
+        assert!(!swap.error_message.unwrap().is_empty());
 
         println!("✅ Error message handling works correctly");
     }
@@ -215,8 +216,6 @@ mod swap_state_tests {
 
 #[cfg(test)]
 mod send_eth_reducer_tests {
-    use super::*;
-
     fn is_valid_eth_address(address: &str) -> bool {
         address.starts_with("0x")
             && address.len() == 42
@@ -233,16 +232,28 @@ mod send_eth_reducer_tests {
 
     #[test]
     fn test_valid_eth_addresses() {
-        assert!(is_valid_eth_address("0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"));
-        assert!(is_valid_eth_address("0x0000000000000000000000000000000000000000"));
-        assert!(is_valid_eth_address("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"));
+        assert!(is_valid_eth_address(
+            "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"
+        ));
+        assert!(is_valid_eth_address(
+            "0x0000000000000000000000000000000000000000"
+        ));
+        assert!(is_valid_eth_address(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        ));
     }
 
     #[test]
     fn test_invalid_eth_addresses() {
-        assert!(!is_valid_eth_address("742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1")); // No 0x
-        assert!(!is_valid_eth_address("0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C")); // Too short
-        assert!(!is_valid_eth_address("0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")); // Invalid hex
+        assert!(!is_valid_eth_address(
+            "742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1"
+        )); // No 0x
+        assert!(!is_valid_eth_address(
+            "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C"
+        )); // Too short
+        assert!(!is_valid_eth_address(
+            "0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        )); // Invalid hex
     }
 
     #[test]

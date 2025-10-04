@@ -1,4 +1,5 @@
 .PHONY: all build check test clean run-ussd run-eth dev logs install setup help \
+		lint fmt fmt-check quality \
 		docker-build docker-build-ussd docker-build-eth docker-build-all \
 		docker-run docker-run-ussd docker-run-eth docker-stop docker-clean \
 		docker-logs docker-compose-up docker-compose-down docker-push
@@ -44,6 +45,28 @@ check:
 	@cd ussdclient && cargo check
 	@cd ethclient && cargo check
 	@echo "✓ All components compile successfully"
+
+# Linting with clippy
+lint:
+	@echo "Running clippy linter..."
+	@cargo clippy --workspace --all-targets --all-features -- -D warnings
+	@echo "✓ Linting passed"
+
+# Check code formatting
+fmt-check:
+	@echo "Checking code formatting..."
+	@cargo fmt --all -- --check
+	@echo "✓ Formatting check passed"
+
+# Format code
+fmt:
+	@echo "Formatting code..."
+	@cargo fmt --all
+	@echo "✓ Code formatted"
+
+# Run all quality checks (lint + format)
+quality: fmt-check lint
+	@echo "✓ All quality checks passed"
 
 # Build everything
 build:
@@ -117,7 +140,9 @@ clean:
 	@echo "✓ Clean complete"
 
 # Verify system health
-verify: check build test
+verify: fmt-check lint check build test
+	@echo "✓ Formatting: PASSED"
+	@echo "✓ Linting: PASSED"
 	@echo "✓ Compilation: PASSED"
 	@echo "✓ Build: PASSED"
 	@echo "✓ Tests: PASSED"
@@ -267,9 +292,13 @@ help:
 	@echo "make setup             - Install deps & setup env"
 	@echo "make build             - Build workspace"
 	@echo "make test              - Run tests"
+	@echo "make lint              - Run clippy linter"
+	@echo "make fmt               - Format code"
+	@echo "make fmt-check         - Check code formatting"
+	@echo "make quality           - Run all quality checks (lint + format)"
 	@echo "make deploy-db         - Deploy module to SpacetimeDB"
 	@echo "make dev               - Start dev env with remote SpacetimeDB"
-	@echo "make verify            - Verify build + DB connection"
+	@echo "make verify            - Full verification (fmt + lint + build + test + DB)"
 	@echo "make prod              - Production build"
 	@echo "make stop-dev          - Stop running services"
 	@echo "make logs              - View logs"

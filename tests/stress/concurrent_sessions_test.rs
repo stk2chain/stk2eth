@@ -60,7 +60,13 @@ mod concurrent_stress_tests {
             session
         }
 
-        fn create_swap(&mut self, session_id: String, from: String, to: String, amount: String) -> Swap {
+        fn create_swap(
+            &mut self,
+            session_id: String,
+            from: String,
+            to: String,
+            amount: String,
+        ) -> Swap {
             let swap = Swap {
                 id: self.swap_counter,
                 session_id,
@@ -154,7 +160,8 @@ mod concurrent_stress_tests {
         assert_eq!(completed_count, 100, "All swaps should be completed");
 
         // Performance checks
-        let avg_response_time = response_times.iter().sum::<Duration>() / response_times.len() as u32;
+        let avg_response_time =
+            response_times.iter().sum::<Duration>() / response_times.len() as u32;
         let max_response_time = response_times.iter().max().unwrap();
 
         println!("✅ 100 concurrent sessions completed");

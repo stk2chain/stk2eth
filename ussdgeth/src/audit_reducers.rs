@@ -11,7 +11,7 @@ pub fn log_send_eth_transaction(
     to_address: String,
     amount: String,
     phone_number: String,
-    session_id: String
+    session_id: String,
 ) {
     // Validate inputs
     if tx_hash.is_empty() || from_address.is_empty() || to_address.is_empty() {
@@ -66,6 +66,7 @@ pub fn log_send_eth_transaction(
 
 // Enhanced reducer with full FATF travel rule data
 #[reducer]
+#[allow(clippy::too_many_arguments)]
 pub fn log_send_eth_transaction_with_fatf(
     ctx: &ReducerContext,
     tx_hash: String,
@@ -81,7 +82,7 @@ pub fn log_send_eth_transaction_with_fatf(
     originator_address: Option<String>,
     beneficiary_address: Option<String>,
     gas_fee: Option<String>,
-    exchange_rate: Option<String>
+    exchange_rate: Option<String>,
 ) {
     // Validate inputs
     if tx_hash.is_empty() || from_address.is_empty() || to_address.is_empty() {
@@ -106,7 +107,7 @@ pub fn log_send_eth_transaction_with_fatf(
     let (compliance_status, risk_score) = if requires_fatf {
         match (&originator_name, &beneficiary_name) {
             (Some(_), Some(_)) => ("COMPLIANT".to_string(), Some(10)),
-            _ => ("FLAGGED".to_string(), Some(80))
+            _ => ("FLAGGED".to_string(), Some(80)),
         }
     } else {
         ("COMPLIANT".to_string(), Some(5))
@@ -147,6 +148,9 @@ pub fn log_send_eth_transaction_with_fatf(
 
     ctx.db.eth_audit_logs().insert(audit_log);
 
-    log::info!("FATF-compliant audit log created for transaction: {} (Risk Score: {:?})",
-               tx_hash, risk_score);
+    log::info!(
+        "FATF-compliant audit log created for transaction: {} (Risk Score: {:?})",
+        tx_hash,
+        risk_score
+    );
 }
