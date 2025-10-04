@@ -1,5 +1,6 @@
 mod audit_reducers;
 mod audit_tests;
+mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
 
@@ -9,6 +10,7 @@ use anyhow::Result;
 use ussdframework::{ScreenType as FrameworkScreenType, USSDMenu as FrameworkMenu};
 mod reducers;
 pub use reducers::send_eth::send_eth;
+pub use reducers::validate_pin::validate_pin;
 
 #[table(name = ussd_session)]
 pub struct USSDSession {
@@ -181,6 +183,27 @@ pub struct USSDRequest {
     status: String,
     created_by: Identity,
     created_at: Timestamp,
+}
+
+#[table(name = user_pin)]
+pub struct UserPIN {
+    #[primary_key]
+    #[index(btree)]
+    pub phone_number: String,
+    pub pin_hash: String,
+    pub salt: String,
+    pub attempts: u32,
+    pub locked: bool,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum PINValidationResult {
+    Success,
+    InvalidPIN,
+    AccountLocked,
+    UserNotFound,
 }
 
 #[spacetimedb::reducer(init)]
@@ -404,6 +427,14 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                             from_address,
                             to_address,
                             amount,
+                        );
+                    } else if svc.function_name == "validate_pin" {
+                        let pin = text.clone();
+                        validate_pin(
+                            ctx,
+                            session.session_id.clone(),
+                            session.phone_number.clone(),
+                            pin,
                         );
                     }
                     log::info!(
