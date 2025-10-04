@@ -65,6 +65,7 @@ pub fn log_send_eth_transaction(
 }
 
 // Enhanced reducer with full FATF travel rule data
+#[allow(clippy::too_many_arguments)]
 #[reducer]
 pub fn log_send_eth_transaction_with_fatf(
     ctx: &ReducerContext,
