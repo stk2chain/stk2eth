@@ -61,9 +61,15 @@
 			"default_next_screen": "PINScreen"
 		},
         "PINScreen": {
-			"text": "PIN",
+			"text": "Enter PIN",
 			"screen_type": "Input",
 			"input_identifier": "pin",
+			"default_next_screen": "ValidatePINFunctionScreen"
+		},
+		"ValidatePINFunctionScreen": {
+			"text": "Validating...",
+			"screen_type": "Function",
+			"function": "validate_pin",
 			"default_next_screen": "CancelTXScreen"
 		},
         "CancelTXScreen": {
@@ -242,6 +248,11 @@
 			"function_name": "send_eth",
 			"function_url": null,
 			"data_key": "send_eth"
+		},
+		"validate_pin": {
+			"function_name": "validate_pin",
+			"function_url": null,
+			"data_key": "pin_validation"
 		}
 	}
 }

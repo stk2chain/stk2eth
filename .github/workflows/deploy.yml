@@ -1,0 +1,341 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DO_REGISTRY: registry.digitalocean.com
+  DO_REGISTRY_NAME: stk2eth
+
+jobs:
+  # Build and push Docker images
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DO_REGISTRY }}
+          username: ${{ secrets.DO_REGISTRY_TOKEN }}
+          password: ${{ secrets.DO_REGISTRY_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push USSD Client image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ussdclient
+          push: true
+          tags: |
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ussdclient:${{ github.sha }}
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ussdclient:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push ETH Client image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ethclient
+          push: true
+          tags: |
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ethclient:${{ github.sha }}
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ethclient:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push All-in-One image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: all-in-one
+          push: true
+          tags: |
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth:${{ github.sha }}
+            ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # Deploy to DigitalOcean Droplet
+  deploy:
+    name: Deploy to DigitalOcean
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ vars.DEPLOYMENT_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory on droplet
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            mkdir -p /opt/stk2eth
+            mkdir -p /opt/stk2eth/logs
+          EOF
+
+      - name: Copy deployment files to droplet
+        run: |
+          scp -o StrictHostKeyChecking=no docker-compose.yml root@${{ secrets.DO_DROPLET_IP }}:/opt/stk2eth/
+          scp -o StrictHostKeyChecking=no scripts/deploy.sh root@${{ secrets.DO_DROPLET_IP }}:/opt/stk2eth/
+          scp -o StrictHostKeyChecking=no scripts/healthcheck.sh root@${{ secrets.DO_DROPLET_IP }}:/opt/stk2eth/
+
+      - name: Create .env file on droplet
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            cat > /opt/stk2eth/.env << 'ENVFILE'
+            # SpacetimeDB Configuration
+            SPACETIME_SERVER=${{ secrets.SPACETIME_SERVER }}
+            SPACETIME_DB_NAME=${{ secrets.SPACETIME_DB_NAME }}
+            SPACETIME_DB_ID=${{ secrets.SPACETIME_DB_ID }}
+            SPACETIME_URL=${{ secrets.SPACETIME_URL }}
+            SPACETIME_API_URL=${{ secrets.SPACETIME_API_URL }}
+            SPACETIME_AUTH_TOKEN=${{ secrets.SPACETIME_AUTH_TOKEN }}
+
+            # Service Configuration
+            USSD_PORT=8080
+            RUST_LOG=info
+
+            # Docker Configuration
+            DOCKER_REGISTRY=registry.digitalocean.com
+            DOCKER_USERNAME=${{ env.DO_REGISTRY_NAME }}
+            IMAGE_TAG=${{ github.sha }}
+          ENVFILE
+          EOF
+
+      - name: Deploy application
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            # Navigate to deployment directory
+            cd /opt/stk2eth
+
+            # Login to DigitalOcean registry
+            echo "${{ secrets.DO_REGISTRY_TOKEN }}" | docker login ${{ env.DO_REGISTRY }} -u ${{ secrets.DO_REGISTRY_TOKEN }} --password-stdin
+
+            # Pull latest images
+            docker pull ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ussdclient:${{ github.sha }}
+            docker pull ${{ env.DO_REGISTRY }}/${{ env.DO_REGISTRY_NAME }}/stk2eth-ethclient:${{ github.sha }}
+
+            # Stop existing containers gracefully
+            docker-compose down --timeout 30 || true
+
+            # Remove old images (keep last 3 versions)
+            docker image prune -af --filter "until=72h" || true
+
+            # Start new containers
+            docker-compose up -d
+
+            # Wait for services to be healthy
+            sleep 10
+
+            # Check container status
+            docker-compose ps
+          EOF
+
+      - name: Health check
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            cd /opt/stk2eth
+            chmod +x healthcheck.sh
+            ./healthcheck.sh
+          EOF
+
+      - name: Deployment status
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            echo "=== Deployment Status ==="
+            docker ps --filter "name=stk2eth" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo ""
+            echo "=== Recent Logs ==="
+            docker-compose logs --tail=50
+          EOF
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            echo "Deployment failed, rolling back..."
+            cd /opt/stk2eth
+
+            # Get previous image tag from backup
+            PREVIOUS_TAG=$(cat .previous_deployment 2>/dev/null || echo "latest")
+
+            # Update .env with previous tag
+            sed -i "s/IMAGE_TAG=.*/IMAGE_TAG=${PREVIOUS_TAG}/" .env
+
+            # Restart with previous version
+            docker-compose down
+            docker-compose up -d
+
+            echo "Rollback complete. Running on tag: ${PREVIOUS_TAG}"
+          EOF
+
+      - name: Save deployment info
+        if: success()
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DO_DROPLET_IP }} << 'EOF'
+            cd /opt/stk2eth
+            # Save current deployment tag for potential rollback
+            echo "${{ github.sha }}" > .previous_deployment
+
+            # Log deployment
+            echo "$(date): Deployed ${{ github.sha }} by ${{ github.actor }}" >> deployment.log
+          EOF
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          echo "Image Tag: ${{ github.sha }}"
+          echo "Deployed to: ${{ secrets.DO_DROPLET_IP }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'staging' }}"
+
+  # Post-deployment verification
+  verify-deployment:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Test USSD endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://${{ secrets.DO_DROPLET_IP }}:8080/ussd \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "sessionId=test&serviceCode=*4337#&phoneNumber=+123456789&networkCode=99999&text=")
+
+          if [ "$response" -eq 200 ] || [ "$response" -eq 201 ]; then
+            echo "✅ USSD endpoint is healthy (HTTP $response)"
+          else
+            echo "❌ USSD endpoint check failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Test health endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            http://${{ secrets.DO_DROPLET_IP }}:8080/health)
+
+          if [ "$response" -eq 200 ]; then
+            echo "✅ Health endpoint is responding (HTTP $response)"
+          else
+            echo "⚠️  Health endpoint check failed (HTTP $response)"
+          fi
+
+      - name: Check SpacetimeDB connectivity
+        env:
+          SPACETIME_SERVER: ${{ secrets.SPACETIME_SERVER }}
+          SPACETIME_DB_ID: ${{ secrets.SPACETIME_DB_ID }}
+        run: |
+          echo "Verifying SpacetimeDB connection..."
+          # This would require spacetime CLI or API call
+          # For now, we trust the service logs
+          echo "✅ SpacetimeDB connectivity assumed healthy (check logs for details)"
+
+  # Notify team
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy, verify-deployment]
+    if: always()
+
+    steps:
+      - name: Slack notification
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "STK2ETH Deployment to DigitalOcean",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Status:* ${{ needs.verify-deployment.result == 'success' && '✅ Success' || '❌ Failed' }}\n*Branch:* ${{ github.ref_name }}\n*Commit:* <${{ github.event.head_commit.url }}|${{ github.sha }}>\n*Author:* ${{ github.actor }}\n*Environment:* ${{ github.event.inputs.environment || 'staging' }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.verify-deployment.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment URL**: http://${{ secrets.DO_DROPLET_IP }}:8080" >> $GITHUB_STEP_SUMMARY

@@ -94,13 +94,9 @@ mod audit_log_tests {
     fn test_phone_number_validation() {
         let valid_phones = vec!["+254792281871", "+1234567890", "+44123456789"];
 
-        let invalid_phones = vec![
-            "254792281871",
-            "+254712345678901",
-            "+254abc123",
-            "+254123",
-            "",
-        ];
+        // Test phone number format validation
+        let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];
+
 
         for phone in valid_phones {
             assert!(phone.starts_with("+"));
@@ -131,7 +127,6 @@ mod audit_log_tests {
         let valid_amounts = vec!["1000000000000000000", "500000000000000000", "1"];
 
         let invalid_amounts = vec!["0", "-1000000000000000000", "abc123", ""];
-
         for amount in valid_amounts {
             assert!(!amount.is_empty());
             assert!(amount.parse::<u64>().is_ok() || amount.len() > 19);

@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # USSD Client Service
+  ussdclient:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ussdclient
+    container_name: stk2eth-ussdclient
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME:-stk2chain}/stk2eth-ussdclient:${IMAGE_TAG:-latest}
+    ports:
+      - "${USSD_PORT:-8080}:8080"
+    environment:
+      - SPACETIME_SERVER=${SPACETIME_SERVER}
+      - SPACETIME_DB_NAME=${SPACETIME_DB_NAME}
+      - SPACETIME_DB_ID=${SPACETIME_DB_ID}
+      - SPACETIME_URL=${SPACETIME_URL}
+      - SPACETIME_API_URL=${SPACETIME_API_URL}
+      - SPACETIME_AUTH_TOKEN=${SPACETIME_AUTH_TOKEN}
+      - USSD_PORT=8080
+      - RUST_LOG=${RUST_LOG:-info}
+    networks:
+      - stk2eth-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Ethereum Client Service
+  ethclient:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ethclient
+    container_name: stk2eth-ethclient
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME:-stk2chain}/stk2eth-ethclient:${IMAGE_TAG:-latest}
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+    networks:
+      - stk2eth-network
+    restart: unless-stopped
+    depends_on:
+      - ussdclient
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # All-in-One Service (Alternative to running separate services)
+  # Uncomment to use this instead of ussdclient + ethclient
+  # all-in-one:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: all-in-one
+  #   container_name: stk2eth-all
+  #   image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME:-stk2chain}/stk2eth:${IMAGE_TAG:-latest}
+  #   ports:
+  #     - "${USSD_PORT:-8080}:8080"
+  #   environment:
+  #     - SPACETIME_SERVER=${SPACETIME_SERVER}
+  #     - SPACETIME_DB_NAME=${SPACETIME_DB_NAME}
+  #     - SPACETIME_DB_ID=${SPACETIME_DB_ID}
+  #     - SPACETIME_URL=${SPACETIME_URL}
+  #     - SPACETIME_API_URL=${SPACETIME_API_URL}
+  #     - SPACETIME_AUTH_TOKEN=${SPACETIME_AUTH_TOKEN}
+  #     - USSD_PORT=8080
+  #     - RUST_LOG=${RUST_LOG:-info}
+  #   networks:
+  #     - stk2eth-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: 30s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 10s
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+networks:
+  stk2eth-network:
+    driver: bridge
+    name: stk2eth-network
