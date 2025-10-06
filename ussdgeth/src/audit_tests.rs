@@ -92,7 +92,7 @@ mod audit_log_tests {
     /// Test phone number format validation
     #[test]
     fn test_phone_number_validation() {
-        let valid_phones = vec!["+254792281871", "+1234567890", "+44123456789"];
+        let _valid_phones = vec!["+254792281871", "+1234567890", "+44123456789"];
 
         // Test phone number format validation
         let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];
@@ -102,6 +102,15 @@ mod audit_log_tests {
             assert!(phone.len() >= 10);
             assert!(phone.len() <= 15);
         }
+
+        let invalid_phones = vec![
+            "254712345678",    // missing '+'
+            "+2547",           // too short
+            "+254712345678901234", // too long
+            "+2547abc45678",   // contains letters
+            "",                // empty
+            "++254712345678",  // double plus
+        ];
 
         for phone in invalid_phones {
             let has_plus = phone.starts_with("+");

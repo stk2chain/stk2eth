@@ -1,10 +1,12 @@
+pub use spacetimedb::Table as SwapTable;
+pub use spacetimedb::Table as USSDSessionTable;
 mod audit_reducers;
 mod audit_tests;
 mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
 
-use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Timestamp};
 
 use anyhow::Result;
 use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
@@ -128,6 +130,29 @@ pub struct USSDMenuItem {
     next_screen: String,
     name: String,
     screen: u64,
+}
+
+#[derive(Clone)]
+#[table(name = swap)]
+pub struct Swap {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub session_id: String,
+    pub from_address: String,
+    pub to_address: String,
+    pub amount: String,
+    pub token_in: String,
+    pub token_out: String,
+    pub status: SwapStatus,
+    pub tx_hash: Option<String>,
+    pub gas_price: Option<String>,
+    pub gas_limit: Option<String>,
+    pub nonce: Option<u64>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub error_message: Option<String>,
+    pub swap_type: SwapType,
 }
 
 #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
@@ -307,12 +332,6 @@ pub fn get_or_create_session(
     initial_screen: String,
 ) {
     if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        let new_message = if session_retrieved.end_session {
-            session_retrieved.message.clone()
-        } else {
-            String::new()
-        };
-
         let updated_session = USSDSession {
             phone_number,
             network_code,
@@ -322,7 +341,6 @@ pub fn get_or_create_session(
             sender: ctx.sender,
             online: true,
             last_interaction_time: ctx.timestamp,
-            message: new_message,
             ..session_retrieved
         };
         ctx.db.ussd_session().session_id().update(updated_session);
@@ -340,7 +358,6 @@ pub fn get_or_create_session(
             last_interaction_time: ctx.timestamp,
             visited_screens: Vec::new(),
             end_session: false,
-            message: String::new(),
         });
     }
 }
@@ -436,6 +453,12 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                             svc.name
                         );
                     }
+                    let mut max_req_id: u64 = 0;
+                    for r in ctx.db.ussd_request().iter() {
+                        if r.id > max_req_id {
+                            max_req_id = r.id;
+                        }
+                    }
                     let new_req_id = max_req_id + 1;
 
                     ctx.db.ussd_request().insert(USSDRequest {
@@ -486,18 +509,6 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
         }
 
         ScreenType::Quit => {
-            let quit_message = if screen_def.text.trim().is_empty() {
-                "END".to_string()
-            } else {
-                format!("END {}", screen_def.text)
-            };
-
-            let updated_session = USSDSession {
-                message: quit_message.clone(),
-                ..session
-            };
-            ctx.db.ussd_session().session_id().update(updated_session);
-
             cleanup_session(ctx, session_id.clone());
         }
 
@@ -655,7 +666,7 @@ mod tests {
             end_session: false,
             sender: Identity::from_byte_array([1; 32]),
             online: true,
-            message: "Welcome".to_string(),
+            authenticated: false,
         };
         assert_eq!(session.session_id, "sess1");
         assert_eq!(session.phone_number, "+254792281871");
