@@ -7,7 +7,7 @@ mod ussdframework;
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use anyhow::Result;
-use ussdframework::{USSDMenu as FrameworkMenu, ussd_screens};
+use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
 mod reducers;
 pub use reducers::send_eth::send_eth;
 pub use reducers::validate_pin::validate_pin;
@@ -145,7 +145,6 @@ pub enum SwapType {
     TokenSwap,
     CashOut,
 }
-
 
 #[table(name = router_option)]
 pub struct USSDRouterOption {
@@ -326,7 +325,7 @@ pub fn get_or_create_session(
             message: new_message,
             ..session_retrieved
         };
-    ctx.db.ussd_session().session_id().update(updated_session);
+        ctx.db.ussd_session().session_id().update(updated_session);
     } else {
         ctx.db.ussd_session().insert(USSDSession {
             session_id,
@@ -418,12 +417,24 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                         });
 
                         if svc.function_name == "send_eth" {
-                            let from_address = "0x0000000000000000000000000000000000000000".to_string();
-                            let to_address = "0x0000000000000000000000000000000000000000".to_string();
+                            let from_address =
+                                "0x0000000000000000000000000000000000000000".to_string();
+                            let to_address =
+                                "0x0000000000000000000000000000000000000000".to_string();
                             let amount = "0.0".to_string();
-                            send_eth(ctx, session.session_id.clone(), from_address, to_address, amount);
+                            send_eth(
+                                ctx,
+                                session.session_id.clone(),
+                                from_address,
+                                to_address,
+                                amount,
+                            );
                         }
-                        log::info!("Enqueued USSDRequest {} for service {}", new_req_id, svc.name);
+                        log::info!(
+                            "Enqueued USSDRequest {} for service {}",
+                            new_req_id,
+                            svc.name
+                        );
                     }
                     let new_req_id = max_req_id + 1;
 
@@ -466,21 +477,21 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                     log::warn!("No service found for function {}", func_name);
                 }
             }
-            
+
             let updated_session = USSDSession {
                 current_screen: screen_def.default_next_screen.clone(),
                 ..session
             };
             ctx.db.ussd_session().session_id().update(updated_session);
         }
-        
+
         ScreenType::Quit => {
             let quit_message = if screen_def.text.trim().is_empty() {
                 "END".to_string()
             } else {
                 format!("END {}", screen_def.text)
             };
-            
+
             let updated_session = USSDSession {
                 message: quit_message.clone(),
                 ..session
@@ -489,9 +500,13 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
 
             cleanup_session(ctx, session_id.clone());
         }
-        
+
         _ => {
-            log::info!("Executing screen type: {:?} for session {}", screen_def.screen_type, session_id);
+            log::info!(
+                "Executing screen type: {:?} for session {}",
+                screen_def.screen_type,
+                session_id
+            );
         }
     }
 }
@@ -542,7 +557,11 @@ pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
 /// Validates a user's choice to either confirm or cancel a pending transaction.
 #[reducer]
 pub fn validate_canceltx(ctx: &ReducerContext, session_id: String, input: String) {
-    let swap = ctx.db.swap().iter().find(|s| s.session_id == session_id.clone());
+    let swap = ctx
+        .db
+        .swap()
+        .iter()
+        .find(|s| s.session_id == session_id.clone());
     if let Some(swap) = swap {
         let mut updated_swap = swap.clone();
         if input.trim() == "2" {
@@ -555,7 +574,6 @@ pub fn validate_canceltx(ctx: &ReducerContext, session_id: String, input: String
         ctx.db.swap().id().update(updated_swap);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
