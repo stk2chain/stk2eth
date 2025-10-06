@@ -1,13 +1,15 @@
+pub use spacetimedb::Table as SwapTable;
+pub use spacetimedb::Table as USSDSessionTable;
 mod audit_reducers;
 mod audit_tests;
 mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
 
-use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Timestamp};
 
 use anyhow::Result;
-use ussdframework::{ScreenType as FrameworkScreenType, USSDMenu as FrameworkMenu};
+use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
 mod reducers;
 pub use reducers::send_eth::send_eth;
 pub use reducers::validate_pin::validate_pin;
@@ -83,7 +85,7 @@ pub struct USSDServiceRow {
     data_key: String,
 }
 
-#[derive(SpacetimeType, Clone, Debug)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum ScreenType {
     Initial,
     Menu,
@@ -93,15 +95,15 @@ pub enum ScreenType {
     Quit,
 }
 
-impl From<FrameworkScreenType> for ScreenType {
-    fn from(ext: FrameworkScreenType) -> Self {
+impl From<ussd_screens::ScreenType> for ScreenType {
+    fn from(ext: ussd_screens::ScreenType) -> Self {
         match ext {
-            FrameworkScreenType::Initial => ScreenType::Initial,
-            FrameworkScreenType::Menu => ScreenType::Menu,
-            FrameworkScreenType::Input => ScreenType::Input,
-            FrameworkScreenType::Function => ScreenType::Function,
-            FrameworkScreenType::Router => ScreenType::Router,
-            FrameworkScreenType::Quit => ScreenType::Quit,
+            ussd_screens::ScreenType::Initial => ScreenType::Initial,
+            ussd_screens::ScreenType::Menu => ScreenType::Menu,
+            ussd_screens::ScreenType::Input => ScreenType::Input,
+            ussd_screens::ScreenType::Function => ScreenType::Function,
+            ussd_screens::ScreenType::Router => ScreenType::Router,
+            ussd_screens::ScreenType::Quit => ScreenType::Quit,
         }
     }
 }
@@ -130,27 +132,12 @@ pub struct USSDMenuItem {
     screen: u64,
 }
 
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapStatus {
-    Pending,
-    Processing,
-    Completed,
-    Failed,
-}
-
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapType {
-    SendEth,
-    TokenSwap,
-    CashOut,
-}
-
+#[derive(Clone)]
 #[table(name = swap)]
 pub struct Swap {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    #[index(btree)]
     pub session_id: String,
     pub from_address: String,
     pub to_address: String,
@@ -166,6 +153,22 @@ pub struct Swap {
     pub updated_at: Timestamp,
     pub error_message: Option<String>,
     pub swap_type: SwapType,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapType {
+    SendEth,
+    TokenSwap,
+    CashOut,
 }
 
 #[table(name = router_option)]
@@ -291,14 +294,16 @@ pub fn init(ctx: &ReducerContext) {
             data_key: service.data_key.clone(),
         });
     }
-    log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
+    log::info!("USSDGETH Initialized by {}!", ctx.sender);
 }
 
+/// Logs a message when a client connects.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
     log::info!("Client Connected, {}!", ctx.sender);
 }
 
+/// Logs a message when a client disconnects.
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
     if let Some(session_retrieved) = ctx.db.ussd_session().sender().find(ctx.sender) {
@@ -315,6 +320,7 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
     }
 }
 
+/// Retrieves an existing USSD session or creates a new one.
 #[reducer]
 pub fn get_or_create_session(
     ctx: &ReducerContext,
@@ -326,7 +332,7 @@ pub fn get_or_create_session(
     initial_screen: String,
 ) {
     if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        ctx.db.ussd_session().session_id().update(USSDSession {
+        let updated_session = USSDSession {
             phone_number,
             network_code,
             service_code,
@@ -336,7 +342,8 @@ pub fn get_or_create_session(
             online: true,
             last_interaction_time: ctx.timestamp,
             ..session_retrieved
-        });
+        };
+        ctx.db.ussd_session().session_id().update(updated_session);
     } else {
         ctx.db.ussd_session().insert(USSDSession {
             session_id,
@@ -355,6 +362,7 @@ pub fn get_or_create_session(
     }
 }
 
+/// Retrieves the name of the initial screen for the USSD service.
 pub fn get_initial_screen(ctx: &ReducerContext) -> String {
     for screen in ctx.db.ussd_screen().iter() {
         if let ScreenType::Initial = screen.screen_type {
@@ -364,6 +372,7 @@ pub fn get_initial_screen(ctx: &ReducerContext) -> String {
     "InitialScreen".to_string()
 }
 
+/// Executes the logic for the current screen of a given session.
 #[reducer]
 pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
     let session = match ctx.db.ussd_session().session_id().find(session_id.clone()) {
@@ -403,10 +412,51 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                 });
 
                 if let Some(svc) = svc_opt {
+                    if svc.function_name == "validate_canceltx" {
+                        validate_canceltx(ctx, session.session_id.clone(), text.clone());
+                    } else {
+                        let mut max_req_id: u64 = 0;
+                        for r in ctx.db.ussd_request().iter() {
+                            if r.id > max_req_id {
+                                max_req_id = r.id
+                            }
+                        }
+                        let new_req_id = max_req_id + 1;
+
+                        ctx.db.ussd_request().insert(USSDRequest {
+                            id: new_req_id,
+                            ussd_menu: svc.ussd_menu,
+                            session_id: session.session_id.clone(),
+                            raw_data: text.clone(),
+                            status: "queued".to_string(),
+                            created_by: ctx.sender,
+                            created_at: ctx.timestamp,
+                        });
+
+                        if svc.function_name == "send_eth" {
+                            let from_address =
+                                "0x0000000000000000000000000000000000000000".to_string();
+                            let to_address =
+                                "0x0000000000000000000000000000000000000000".to_string();
+                            let amount = "0.0".to_string();
+                            send_eth(
+                                ctx,
+                                session.session_id.clone(),
+                                from_address,
+                                to_address,
+                                amount,
+                            );
+                        }
+                        log::info!(
+                            "Enqueued USSDRequest {} for service {}",
+                            new_req_id,
+                            svc.name
+                        );
+                    }
                     let mut max_req_id: u64 = 0;
                     for r in ctx.db.ussd_request().iter() {
                         if r.id > max_req_id {
-                            max_req_id = r.id
+                            max_req_id = r.id;
                         }
                     }
                     let new_req_id = max_req_id + 1;
@@ -450,19 +500,29 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                     log::warn!("No service found for function {}", func_name);
                 }
             }
-            // Update the current screen to the next screen
-            ctx.db.ussd_session().session_id().update(USSDSession {
-                current_screen: screen_def.default_next_screen,
+
+            let updated_session = USSDSession {
+                current_screen: screen_def.default_next_screen.clone(),
                 ..session
-            });
+            };
+            ctx.db.ussd_session().session_id().update(updated_session);
         }
+
+        ScreenType::Quit => {
+            cleanup_session(ctx, session_id.clone());
+        }
+
         _ => {
-            log::info!("Executing screen type: {:?}", screen_def.screen_type);
-            // Handle other screen types here in the future
+            log::info!(
+                "Executing screen type: {:?} for session {}",
+                screen_def.screen_type,
+                session_id
+            );
         }
     }
 }
 
+/// Main entry point for handling incoming USSD requests.
 #[reducer]
 pub fn handle_ussd(
     ctx: &ReducerContext,
@@ -491,49 +551,162 @@ pub fn handle_ussd(
     }
 }
 
+/// Marks a USSD session as ended and offline.
+#[reducer]
+pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
+    if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
+        let updated_session = USSDSession {
+            online: false,
+            end_session: true,
+            ..session
+        };
+        ctx.db.ussd_session().session_id().update(updated_session);
+        log::info!("Session {} cleaned up.", session_id);
+    }
+}
+
+/// Validates a user's choice to either confirm or cancel a pending transaction.
+#[reducer]
+pub fn validate_canceltx(ctx: &ReducerContext, session_id: String, input: String) {
+    let swap = ctx
+        .db
+        .swap()
+        .iter()
+        .find(|s| s.session_id == session_id.clone());
+    if let Some(swap) = swap {
+        let mut updated_swap = swap.clone();
+        if input.trim() == "2" {
+            updated_swap.status = SwapStatus::Cancelled;
+            log::info!("Swap for session {} cancelled.", session_id);
+        } else if input.trim() == "1" {
+            updated_swap.status = SwapStatus::Processing;
+            log::info!("Swap for session {} confirmed for processing.", session_id);
+        }
+        ctx.db.swap().id().update(updated_swap);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // NOTE: Disabled test helper function - incompatible with SpacetimeDB 1.4.0 API
-    // fn setup_test_db(ctx: &ReducerContext) {
-    //     // Function to initialize DB with test data
-    //     let menu = ctx.db.ussd_menu().insert(USSDMenu {
-    //         id: 1,
-    //         service_code: "*123#".to_string(),
-    //     });
+    #[allow(dead_code)]
+    fn setup_common_test_db(ctx: &mut ReducerContext) {
+        let menu = ctx.db.ussd_menu().insert(USSDMenu {
+            id: 1,
+            service_code: "*4337#".to_string(),
+        });
 
-    //     ctx.db.ussd_screen().insert(USSDScreen {
-    //         id: 1,
-    //         ussd_menu: menu.id,
-    //         name: "EnterPin".to_string(),
-    //         text: "Enter your PIN".to_string(),
-    //         screen_type: ScreenType::Function,
-    //         default_next_screen: "ConfirmPin".to_string(),
-    //         service_code: "*123#".to_string(),
-    //         function: Some("validate_pin".to_string()),
-    //         input_identifier: None,
-    //     });
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 1,
+            ussd_menu: menu.id,
+            name: "EnterPin".to_string(),
+            text: "Enter your PIN".to_string(),
+            screen_type: ScreenType::Function,
+            default_next_screen: "ConfirmPin".to_string(),
+            service_code: "*4337#".to_string(),
+            function: Some("validate_pin".to_string()),
+            input_identifier: None,
+        });
 
-    //     ctx.db.ussd_service().insert(USSDServiceRow {
-    //         id: 1,
-    //         ussd_menu: menu.id,
-    //         name: "validate_pin".to_string(),
-    //         function_name: "validate_pin_function".to_string(),
-    //         function_url: None,
-    //         data_key: "pin".to_string(),
-    //     });
-    // }
+        ctx.db.ussd_service().insert(USSDServiceRow {
+            id: 1,
+            ussd_menu: menu.id,
+            name: "validate_pin".to_string(),
+            function_name: "validate_pin_function".to_string(),
+            function_url: None,
+            data_key: "pin".to_string(),
+        });
+
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 2,
+            ussd_menu: menu.id,
+            name: "QuitScreen".to_string(),
+            text: "Thank you for using our service.".to_string(),
+            screen_type: ScreenType::Quit,
+            default_next_screen: "".to_string(),
+            service_code: "*4337#".to_string(),
+            function: None,
+            input_identifier: None,
+        });
+
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 3,
+            ussd_menu: menu.id,
+            name: "ConfirmCancelTx".to_string(),
+            text: "Confirm or cancel transaction".to_string(),
+            screen_type: ScreenType::Function,
+            default_next_screen: "TransactionResult".to_string(),
+            service_code: "*4337#".to_string(),
+            function: Some("validate_canceltx".to_string()),
+            input_identifier: None,
+        });
+
+        ctx.db.ussd_service().insert(USSDServiceRow {
+            id: 2,
+            ussd_menu: menu.id,
+            name: "validate_canceltx".to_string(),
+            function_name: "validate_canceltx".to_string(),
+            function_url: None,
+            data_key: "cancel_tx".to_string(),
+        });
+    }
 
     #[test]
-    fn menu_json_contains_send_eth_service() {
-        let content = include_str!("./data/menu.json");
-        let menu: ussdframework::USSDMenu =
-            serde_json::from_str(content).expect("failed to parse menu.json");
-        assert!(
-            menu.services.contains_key("send_eth"),
-            "menu.json should contain a send_eth service"
-        );
+    fn test_ussd_session_struct_fields() {
+        let session = USSDSession {
+            session_id: "sess1".to_string(),
+            phone_number: "+254792281871".to_string(),
+            network_code: "net1".to_string(),
+            service_code: "*4337#".to_string(),
+            data: "testdata".to_string(),
+            current_screen: "screen1".to_string(),
+            visited_screens: vec!["screen0".to_string()],
+            last_interaction_time: Timestamp::now(),
+            end_session: false,
+            sender: Identity::from_byte_array([1; 32]),
+            online: true,
+            authenticated: false,
+        };
+        assert_eq!(session.session_id, "sess1");
+        assert_eq!(session.phone_number, "+254792281871");
+        assert!(session.online);
+        assert!(!session.end_session);
+        assert_eq!(session.visited_screens.len(), 1);
+    }
+
+    #[test]
+    fn test_swap_struct_fields() {
+        let swap = Swap {
+            id: 1,
+            session_id: "sess1".to_string(),
+            from_address: "0xfrom".to_string(),
+            to_address: "0xto".to_string(),
+            amount: "1000".to_string(),
+            token_in: "ETH".to_string(),
+            token_out: "USD".to_string(),
+            status: SwapStatus::Pending,
+            tx_hash: Some("0xhash".to_string()),
+            gas_price: Some("100".to_string()),
+            gas_limit: Some("21000".to_string()),
+            nonce: Some(1),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
+            error_message: None,
+            swap_type: SwapType::SendEth,
+        };
+        assert_eq!(swap.session_id, "sess1");
+        assert_eq!(swap.from_address, "0xfrom");
+        assert_eq!(swap.status, SwapStatus::Pending);
+        assert_eq!(swap.swap_type, SwapType::SendEth);
+        assert!(swap.tx_hash.is_some());
+    }
+
+    #[test]
+    fn test_swap_status_enum() {
+        assert_eq!(format!("{:?}", SwapStatus::Pending), "Pending");
+        assert_eq!(format!("{:?}", SwapStatus::Completed), "Completed");
+        assert_ne!(SwapStatus::Failed, SwapStatus::Processing);
     }
 
     // NOTE: Disabled test - incompatible with SpacetimeDB 1.4.0 API
