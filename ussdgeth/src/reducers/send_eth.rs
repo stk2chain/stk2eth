@@ -1,11 +1,13 @@
-use crate::{Swap, USSDSession, SwapStatus, SwapType};
-use spacetimedb::Table;
 use crate::swap;
 use crate::ussd_session;
+use crate::{Swap, SwapStatus, SwapType, USSDSession};
+use spacetimedb::Table;
 use spacetimedb::{reducer, ReducerContext};
 
 fn is_valid_eth_address(address: &str) -> bool {
-    address.starts_with("0x") && address.len() == 42 && address[2..].chars().all(|c| c.is_ascii_hexdigit())
+    address.starts_with("0x")
+        && address.len() == 42
+        && address[2..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
 fn is_valid_amount(amount: &str) -> Result<f64, String> {
