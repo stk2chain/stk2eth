@@ -97,7 +97,6 @@ mod audit_log_tests {
         // Test phone number format validation
         let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];
 
-
         for phone in valid_phones {
             assert!(phone.starts_with("+"));
             assert!(phone.len() >= 10);
