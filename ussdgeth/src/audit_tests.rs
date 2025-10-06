@@ -104,12 +104,12 @@ mod audit_log_tests {
         }
 
         let invalid_phones = vec![
-            "254712345678",    // missing '+'
-            "+2547",           // too short
+            "254712345678",        // missing '+'
+            "+2547",               // too short
             "+254712345678901234", // too long
-            "+2547abc45678",   // contains letters
-            "",                // empty
-            "++254712345678",  // double plus
+            "+2547abc45678",       // contains letters
+            "",                    // empty
+            "++254712345678",      // double plus
         ];
 
         for phone in invalid_phones {
