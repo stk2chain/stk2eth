@@ -101,6 +101,13 @@ mod audit_log_tests {
             assert!(phone.starts_with("+"));
             assert!(phone.len() >= 10);
             assert!(phone.len() <= 15);
+            // Only one leading plus allowed
+            assert_eq!(
+                phone.chars().take_while(|&c| c == '+').count(),
+                1,
+                "Phone '{}' should have only one leading plus",
+                phone
+            );
         }
 
         let invalid_phones = vec![
@@ -117,8 +124,13 @@ mod audit_log_tests {
             let correct_length = phone.len() >= 10 && phone.len() <= 15;
             let only_digits_and_plus = phone.chars().all(|c| c.is_ascii_digit() || c == '+');
             let not_empty = !phone.is_empty();
+            let single_leading_plus = phone.chars().take_while(|&c| c == '+').count() == 1;
 
-            let is_valid = has_plus && correct_length && only_digits_and_plus && not_empty;
+            let is_valid = has_plus
+                && correct_length
+                && only_digits_and_plus
+                && not_empty
+                && single_leading_plus;
 
             assert!(
                 !is_valid,
