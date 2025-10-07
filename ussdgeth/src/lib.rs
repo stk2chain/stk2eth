@@ -5,6 +5,7 @@ mod audit_tests;
 mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
+pub(crate) mod amount_validation_tests;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Timestamp};
 
@@ -169,6 +170,20 @@ pub enum SwapType {
     SendEth,
     TokenSwap,
     CashOut,
+}
+
+#[table(name = app_config)]
+pub struct AppConfig {
+    #[primary_key]
+    key: String,
+    value: String,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum AmountValidationResult {
+    Valid,
+    TooLow,
+    Invalid,
 }
 
 #[table(name = router_option)]
