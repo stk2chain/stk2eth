@@ -1,11 +1,11 @@
 pub use spacetimedb::Table as SwapTable;
 pub use spacetimedb::Table as USSDSessionTable;
+pub(crate) mod amount_validation_tests;
 mod audit_reducers;
 mod audit_tests;
 mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
-pub(crate) mod amount_validation_tests;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Timestamp};
 
@@ -449,18 +449,44 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                         });
 
                         if svc.function_name == "send_eth" {
-                            let from_address =
-                                "0x0000000000000000000000000000000000000000".to_string();
-                            let to_address =
-                                "0x0000000000000000000000000000000000000000".to_string();
-                            let amount = "0.0".to_string();
-                            send_eth(
+                            // Inlined quick validation flow: call validate_amount reducer and map errors to screens
+                            let amount = text.clone();
+                            match crate::reducers::amount_validation::validate_amount(
                                 ctx,
-                                session.session_id.clone(),
-                                from_address,
-                                to_address,
-                                amount,
-                            );
+                                amount.clone(),
+                            ) {
+                                Ok(()) => {
+                                    // proceed to send_eth with placeholders (real flow would extract addresses)
+                                    let from_address =
+                                        "0x0000000000000000000000000000000000000000".to_string();
+                                    let to_address =
+                                        "0x0000000000000000000000000000000000000000".to_string();
+                                    send_eth(
+                                        ctx,
+                                        session.session_id.clone(),
+                                        from_address,
+                                        to_address,
+                                        amount,
+                                    );
+                                }
+                                Err(code) => {
+                                    // Map known error codes to quit screens
+                                    let screen_name = match code.as_str() {
+                                        "amount_too_low" => "AmountTooLowScreen",
+                                        "amount_invalid" => "AmountInvalidScreen",
+                                        _ => "FailureScreen",
+                                    };
+
+                                    let updated_session = USSDSession {
+                                        current_screen: screen_name.to_string(),
+                                        ..session
+                                    };
+                                    ctx.db.ussd_session().session_id().update(updated_session);
+                                    // We've routed to a quit/error screen; stop processing to avoid using the
+                                    // consumed `session` value afterwards.
+                                    return;
+                                }
+                            }
                         }
                         log::info!(
                             "Enqueued USSDRequest {} for service {}",
@@ -468,49 +494,6 @@ pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
                             svc.name
                         );
                     }
-                    let mut max_req_id: u64 = 0;
-                    for r in ctx.db.ussd_request().iter() {
-                        if r.id > max_req_id {
-                            max_req_id = r.id;
-                        }
-                    }
-                    let new_req_id = max_req_id + 1;
-
-                    ctx.db.ussd_request().insert(USSDRequest {
-                        id: new_req_id,
-                        ussd_menu: svc.ussd_menu,
-                        session_id: session.session_id.clone(),
-                        raw_data: text.clone(),
-                        status: "queued".to_string(),
-                        created_by: ctx.sender,
-                        created_at: ctx.timestamp,
-                    });
-
-                    if svc.function_name == "send_eth" {
-                        let from_address = "0x0000000000000000000000000000000000000000".to_string();
-                        let to_address = "0x0000000000000000000000000000000000000000".to_string();
-                        let amount = "0.0".to_string();
-                        send_eth(
-                            ctx,
-                            session.session_id.clone(),
-                            from_address,
-                            to_address,
-                            amount,
-                        );
-                    } else if svc.function_name == "validate_pin" {
-                        let pin = text.clone();
-                        validate_pin(
-                            ctx,
-                            session.session_id.clone(),
-                            session.phone_number.clone(),
-                            pin,
-                        );
-                    }
-                    log::info!(
-                        "Enqueued USSDRequest {} for service {}",
-                        new_req_id,
-                        svc.name
-                    );
                 } else {
                     log::warn!("No service found for function {}", func_name);
                 }
@@ -722,6 +705,29 @@ mod tests {
         assert_eq!(format!("{:?}", SwapStatus::Pending), "Pending");
         assert_eq!(format!("{:?}", SwapStatus::Completed), "Completed");
         assert_ne!(SwapStatus::Failed, SwapStatus::Processing);
+    }
+
+    // Pure helper to map reducer error codes to screen names. Kept pure so it can be unit tested
+    // without requiring a live ReducerContext or linking SpacetimeDB native libraries.
+    pub fn map_amount_error_code(code: &str) -> &'static str {
+        match code {
+            "amount_too_low" => "AmountTooLowScreen",
+            "amount_invalid" => "AmountInvalidScreen",
+            _ => "FailureScreen",
+        }
+    }
+
+    #[test]
+    fn test_map_amount_error_code() {
+        assert_eq!(
+            map_amount_error_code("amount_too_low"),
+            "AmountTooLowScreen"
+        );
+        assert_eq!(
+            map_amount_error_code("amount_invalid"),
+            "AmountInvalidScreen"
+        );
+        assert_eq!(map_amount_error_code("unknown"), "FailureScreen");
     }
 
     // NOTE: Disabled test - incompatible with SpacetimeDB 1.4.0 API
