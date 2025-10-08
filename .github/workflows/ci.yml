@@ -315,9 +315,11 @@ jobs:
         run: |
           if [ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]; then
             # Only build binary crates for musl (cdylib not supported)
+            echo "Building binary crates only for musl target (ussdgeth cdylib not supported)"
             cargo build --release --package ussdclient --package ethclient --target ${{ matrix.target }}
           else
-            # Build entire workspace for native target
+            # Build entire workspace for native target (includes ussdgeth cdylib)
+            echo "Building entire workspace for gnu target"
             cargo build --release --workspace --target ${{ matrix.target }}
           fi
 
