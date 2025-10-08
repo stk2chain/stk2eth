@@ -1,7 +1,9 @@
 use spacetimedb::ReducerContext;
 
-use crate::AmountValidationResult;
 use crate::app_config;
+use crate::AmountValidationResult;
+use rust_decimal::prelude::FromStr;
+use rust_decimal::Decimal;
 
 /// Validates that the amount is a valid number and meets the minimum threshold
 /// # Arguments
@@ -14,14 +16,14 @@ use crate::app_config;
 /// let result = validate_amount_value("0.0005", 0.00025);
 /// assert_eq!(result, AmountValidationResult::Valid);
 /// ```
-pub fn validate_amount_value(amount: &str, min_amount: f64) -> AmountValidationResult {
+pub fn validate_amount_value(amount: &str, min_amount: Decimal) -> AmountValidationResult {
     if amount.trim().is_empty() {
         return AmountValidationResult::Invalid;
     }
 
-    match amount.parse::<f64>() {
-        Ok(amount_f64) => {
-            if amount_f64 < min_amount {
+    match Decimal::from_str(amount.trim()) {
+        Ok(amount_dec) => {
+            if amount_dec < min_amount {
                 AmountValidationResult::TooLow
             } else {
                 AmountValidationResult::Valid
@@ -33,14 +35,20 @@ pub fn validate_amount_value(amount: &str, min_amount: f64) -> AmountValidationR
 
 #[spacetimedb::reducer]
 pub fn validate_amount(ctx: &ReducerContext, amount: String) -> Result<(), String> {
-    let mut min_amount: f64 = 0.00025; 
+    // Use Decimal for precise financial calculations. Default: 0.00025
+    let mut min_amount = Decimal::from_str("0.00025").unwrap();
 
-    if let Some(cfg) = ctx.db.app_config().key().find("min_transfer_amount".to_string()) {
-        if let Ok(parsed) = cfg.value.parse::<f64>() {
+    if let Some(cfg) = ctx
+        .db
+        .app_config()
+        .key()
+        .find("min_transfer_amount".to_string())
+    {
+        if let Ok(parsed) = Decimal::from_str(&cfg.value) {
             min_amount = parsed;
         }
     } else if let Ok(env_min) = std::env::var("MIN_TRANSFER_AMOUNT") {
-        if let Ok(parsed) = env_min.parse::<f64>() {
+        if let Ok(parsed) = Decimal::from_str(&env_min) {
             min_amount = parsed;
         }
     }
