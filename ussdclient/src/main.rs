@@ -1,144 +1,254 @@
+// ussdclient/src/main.rs
+// USSD webhook server (Axum) for Africa's Talking -> SpacetimeDB reducer integration.
+//
+// Accepts form (x-www-form-urlencoded) and JSON payloads.
+// Calls SpacetimeDB reducer: POST {SPACETIME_API_URL}/call/handle_ussd
+// Then queries SQL: {SPACETIME_API_URL}/sql to fetch the current screen text.
+// Returns plain text (CON/END message) to Africa's Talking.
+
+use anyhow::Result;
 use axum::{
-    extract::Form,
-    response::{IntoResponse, Response},
+    extract::{Form, Json, State},
+    response::IntoResponse,
+    response::Response,
     routing::post,
-    Json, Router,
+    Router,
 };
 use dotenv::dotenv;
-use serde::Deserialize;
-use std::{env, net::SocketAddr};
-// use tokio::net::TcpListener;
 use reqwest::Client;
+use serde::Deserialize;
 use serde_json::Value;
+use std::{env, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
+use tracing::{error, info};
 
-// --- Form payload from Africa's Talking ---
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct UssdRequest {
-    session_id: String,
-    service_code: String,
-    phone_number: String,
-    network_code: String,
-    text: String,
+async fn handle_ussd(State(state): State<AppState>, body_bytes: axum::body::Bytes) -> Response {
+    // Try parse as form first
+    if let Ok(form_data) = serde_urlencoded::from_bytes::<AfricastalkingForm>(&body_bytes) {
+        return handle_form(State(state.clone()), Form(form_data)).await;
+    }
+
+    // Try parse as JSON
+    if let Ok(json_data) = serde_json::from_slice::<Value>(&body_bytes) {
+        return handle_json(State(state), Json(json_data)).await;
+    }
+
+    plain_text_response("END Invalid payload format".to_string())
 }
 
-// --- Handler ---
-#[allow(dead_code)]
-async fn ussd_handler(Form(payload): Form<UssdRequest>) -> Response {
-    // Build JSON payload for SpaceTimeDB reducer
-    let json_payload = serde_json::json!({
-        "sessionId": payload.session_id,
-        "phoneNumber": payload.phone_number,
-        "networkCode": payload.network_code,
-        "serviceCode": payload.service_code,
-        "text": payload.text,
+#[derive(Debug, Deserialize)]
+struct AfricastalkingForm {
+    #[serde(alias = "sessionId", alias = "session_id")]
+    session_id: Option<String>,
+    #[serde(alias = "serviceCode", alias = "service_code")]
+    service_code: Option<String>,
+    #[serde(alias = "phoneNumber", alias = "phone_number")]
+    phone_number: Option<String>,
+    #[serde(alias = "networkCode", alias = "network_code")]
+    network_code: Option<String>,
+    text: Option<String>,
+}
+
+#[derive(Clone)]
+struct AppState {
+    client: Client,
+    spacetime_call: String,
+    spacetime_sql: String,
+    token: String,
+    // optional simple in-memory rate limiter or counters
+    _counter: Arc<Mutex<u64>>,
+}
+
+fn plain_text_response(body: String) -> Response {
+    ([(axum::http::header::CONTENT_TYPE, "text/plain")], body).into_response()
+}
+
+async fn handle_form(
+    State(s): State<AppState>,
+    Form(payload): Form<AfricastalkingForm>,
+) -> Response {
+    let session_id = payload.session_id.unwrap_or_default();
+    let service_code = payload.service_code.unwrap_or_default();
+    let phone_number = payload.phone_number.unwrap_or_default();
+    let network_code = payload.network_code.unwrap_or_default();
+    let text = payload.text.unwrap_or_default();
+
+    process_ussd(
+        &s,
+        &session_id,
+        &phone_number,
+        &network_code,
+        &service_code,
+        &text,
+    )
+    .await
+}
+
+async fn handle_json(State(s): State<AppState>, Json(body): Json<Value>) -> Response {
+    let session_id = body
+        .get("sessionId")
+        .or_else(|| body.get("session_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let service_code = body
+        .get("serviceCode")
+        .or_else(|| body.get("service_code"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let phone_number = body
+        .get("phoneNumber")
+        .or_else(|| body.get("phone_number"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let network_code = body
+        .get("networkCode")
+        .or_else(|| body.get("network_code"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    let text = body
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    process_ussd(
+        &s,
+        &session_id,
+        &phone_number,
+        &network_code,
+        &service_code,
+        &text,
+    )
+    .await
+}
+
+async fn process_ussd(
+    state: &AppState,
+    session_id: &str,
+    phone_number: &str,
+    network_code: &str,
+    service_code: &str,
+    text: &str,
+) -> Response {
+    // call reducer
+    let payload = serde_json::json!({
+        "session_id": session_id,
+        "phone_number": phone_number,
+        "network_code": network_code,
+        "service_code": service_code,
+        "text": text
     });
 
-    let mut reply_text: String = "END Service unavailable".to_string();
-
-    // Call SpaceTimeDB reducer over HTTP (assuming reducer is exposed at /call/handle_ussd)
-    let client = Client::new();
-    //let spacetime_url = "http://127.0.0.1:3000/v1/database/gateway/call/handle_ussd"; // adjust for your SpacetimeDB instance
-    //let spacetime_sql_url = "http://127.0.0.1:3000/v1/database/gateway/sql";
-
-    let spacetime_url = std::env::var("SPACETIME_API_URL").unwrap() + "/call/handle_ussd";
-    let spacetime_sql_url = std::env::var("SPACETIME_API_URL").unwrap() + "/sql";
-    let token = std::env::var("SPACETIME_AUTH_TOKEN").unwrap();
-
-    let _response = client.post(spacetime_url).json(&json_payload).send().await;
-
-    let sql_query = format!(
-        "SELECT s.text \
-        FROM ussd_session AS sess \
-        JOIN ussd_screen AS s \
-        ON sess.current_screen = s.name \
-        WHERE sess.session_id = '{}';",
-        payload.session_id
-    );
-
-    let rpl = client
-        .post(spacetime_sql_url)
-        .bearer_auth(token) // load from creds
-        .header("Content-Type", "text/plain") // 👈 tell it this is raw SQL
-        .body(sql_query) // 👈 just the SQL text
+    let call_res = state
+        .client
+        .post(&state.spacetime_call)
+        .bearer_auth(&state.token)
+        .json(&payload)
         .send()
         .await;
 
-    // let rply = rpl.unwrap();
-    let body = rpl.unwrap().text().await.unwrap();
+    if let Err(e) = call_res {
+        error!("Spacetime reducer call failed: {:?}", e);
+        return plain_text_response("END Service temporarily unavailable".to_string());
+    }
 
-    println!("Response {:?}. ", body);
+    // query SQL to get the screen text for the session
+    let sql = format!(
+        "SELECT s.text FROM ussd_session AS sess JOIN ussd_screen AS s ON sess.current_screen = s.name WHERE sess.session_id = '{}';",
+        session_id.replace('\'', "''")
+    );
 
+    let sql_res = state
+        .client
+        .post(&state.spacetime_sql)
+        .bearer_auth(&state.token)
+        .header("Content-Type", "text/plain")
+        .body(sql)
+        .send()
+        .await;
+
+    if let Err(e) = sql_res {
+        error!("Spacetime SQL request failed: {:?}", e);
+        return plain_text_response("END Service temporarily unavailable".to_string());
+    }
+
+    let body = match sql_res.unwrap().text().await {
+        Ok(b) => b,
+        Err(e) => {
+            error!("Failed reading SQL response text: {:?}", e);
+            return plain_text_response("END Service temporarily unavailable".to_string());
+        }
+    };
+
+    // parse the likely JSON shapes returned by SpacetimeDB SQL
     if let Ok(json) = serde_json::from_str::<Value>(&body) {
-        if let Some(row_value) = json
-            .get(0) // outer array
+        // common shape: [{ "rows": [ ["Menu text"] ] }]
+        if let Some(screen_text) = json
+            .get(0)
             .and_then(|v| v.get("rows"))
-            .and_then(|rows| rows.get(0)) // first row
-            .and_then(|row| row.get(0)) // first column
+            .and_then(|rows| rows.get(0))
+            .and_then(|row| row.get(0))
             .and_then(|val| val.as_str())
         {
-            reply_text = row_value.to_string();
+            return plain_text_response(screen_text.to_string());
+        }
+
+        // alternative shape: { "rows": [ ["Menu text"] ] }
+        if let Some(row0) = json.get("rows").and_then(|r| r.get(0)) {
+            if let Some(col0) = row0.get(0).and_then(|c| c.as_str()) {
+                return plain_text_response(col0.to_string());
+            }
         }
     }
 
-    // Respond in text/plain (required by Africa’s Talking)
-    (
-        [(axum::http::header::CONTENT_TYPE, "text/plain")],
-        reply_text,
-    )
-        .into_response()
+    plain_text_response("END An error occurred. Try again later.".to_string())
 }
 
-// --- Main server ---
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Load environment variables from .env
+async fn main() -> Result<()> {
     dotenv().ok();
+    tracing_subscriber::fmt::init();
 
-    // Read env vars
-    let spacetime_api =
-        env::var("SPACETIME_API_URL").expect("SPACETIME_API_URL must be set in .env");
-    let spacetime_token =
-        env::var("SPACETIME_AUTH_TOKEN").expect("SPACETIME_AUTH_TOKEN must be set in .env");
+    let spacetime_api = env::var("SPACETIME_API_URL").expect("SPACETIME_API_URL must be set");
+    let token = env::var("SPACETIME_AUTH_TOKEN").expect("SPACETIME_AUTH_TOKEN must be set");
+
+    let call = format!("{}/call/handle_ussd", spacetime_api);
+    let sql = format!("{}/sql", spacetime_api);
+
+    let client = Client::builder().timeout(Duration::from_secs(6)).build()?;
+
+    let app_state = AppState {
+        client,
+        spacetime_call: call,
+        spacetime_sql: sql,
+        token,
+        _counter: Arc::new(Mutex::new(0)),
+    };
+
     let port: u16 = env::var("USSD_PORT")
         .unwrap_or_else(|_| "8080".into())
         .parse()
-        .expect("USSD_PORT must be a valid number");
+        .unwrap_or(8080);
 
-    // Build URLs
-    let spacetime_url = format!("{}/call/handle_ussd", spacetime_api);
-    let _spacetime_sql_url = format!("{}/sql", spacetime_api);
+    let app = Router::new()
+        .route("/ussd", post(handle_ussd))
+        .route("/health", post(|| async { "ok" }))
+        .with_state(app_state);
 
-    // Prepare HTTP client with bearer token
-    let client = Client::builder().build()?;
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    info!("USSD webhook listening on http://{}", addr);
+    use tokio::net::TcpListener;
 
-    // Example: store client & token in app state
-    let app = Router::new().route(
-        "/ussd",
-        post(move |Json(body): Json<Value>| {
-            let client = client.clone();
-            let spacetime_url = spacetime_url.clone();
-            let spacetime_token = spacetime_token.clone();
-            async move {
-                let res = client
-                    .post(&spacetime_url)
-                    .bearer_auth(&spacetime_token)
-                    .json(&body)
-                    .send()
-                    .await
-                    .map_err(|e| format!("Error: {:?}", e))?;
-
-                Ok::<_, String>(res.text().await.unwrap_or_default())
-            }
-        }),
-    );
-
-    // Start server
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    println!("USSD server running on http://{}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service()).await?;
+    let listener = TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

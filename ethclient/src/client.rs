@@ -6,6 +6,12 @@ pub struct EthClient {
 }
 
 impl EthClient {
+    pub async fn send_eth(&self, _p0: H160, _p1: f64) {
+        todo!()
+    }
+}
+
+impl EthClient {
     pub async fn new(infura_url: &str, _master_key: &str) -> Result<Self> {
         let provider = Provider::<Http>::try_from(infura_url)?;
         Ok(Self { provider })
