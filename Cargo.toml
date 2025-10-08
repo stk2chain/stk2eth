@@ -3,6 +3,7 @@ members = [
     "ussdgeth",
     "ussdclient",
     "ethclient"
+    ,"tools/validate_menu"
 ]
 resolver = "2"
 
