@@ -114,6 +114,16 @@
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
+		"AmountTooLowScreen": {
+			"text": "Amount is below minimum allowed. Transaction cancelled.",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
+		"AmountInvalidScreen": {
+			"text": "Invalid amount entered. Transaction cancelled.",
+			"screen_type": "Quit",
+			"default_next_screen": "MainScreen"
+		},
 		"BalanceInquiryScreen": {
 			"text": "Select Account",
 			"screen_type": "Menu",
