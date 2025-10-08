@@ -303,6 +303,13 @@ help:
 	@echo "make stop-dev          - Stop running services"
 	@echo "make logs              - View logs"
 	@echo "make clean             - Clean build artifacts"
+
+
+.PHONY: validate-menu
+validate-menu:
+	@echo "Validating menu.json against basic schema..."
+	@cd tools/validate_menu && cargo run --quiet || (echo "menu.json validation failed" && exit 2)
+	@echo "menu.json OK"
 	@echo ""
 	@echo "=== Docker Commands ==="
 	@echo "make docker-build      - Build all Docker images"
