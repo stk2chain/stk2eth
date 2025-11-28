@@ -1,12 +1,41 @@
 {
 	"menus": {
 		"InitialScreen": {
-			"text": "Welcome to USSDETH",
+			"text": "Welcome to M-ETH",
 			"screen_type": "Initial",
 			"default_next_screen": "MainScreen"
 		},
+		"RegisterScreen": {
+			"text": "Welcome to M-ETH.",
+			"screen_type": "Menu",
+			"default_next_screen": "MainScreen",
+			"menu_items": {
+				"RegisterOption": {
+					"option":"1",
+					"display_name":"Register",
+					"next_screen":"RegisterPinScreen"
+				},
+				"CancelOption": {
+					"option":"2",
+					"display_name":"Cancel",
+					"next_screen":"DefaultNoneScreen"
+				}
+			}
+		},
+		"RegisterPinScreen": {
+			"text": "Register PIN",
+			"screen_type": "Function",
+			"function": "register_pin",
+			"default_next_screen": "ConfirmRegisterPinScreen"
+		},
+		"ConfirmRegisterPinScreen": {
+			"text": "Confirm PIN",
+			"screen_type": "Function",
+			"function": "confirm_register_pin",
+			"default_next_screen": "MainScreen"
+		},
 		"MainScreen": {
-			"text": "USSDETH Main Menu",
+			"text": "M-ETH",
 			"screen_type": "Menu",
 			"default_next_screen": "DefaultNoneScreen",
 			"menu_items": {
@@ -30,73 +59,42 @@
 					"display_name": "Check Balance",
 					"next_screen": "BalanceScreen"
 				},
-				"SendMoneyOption": {
+				"AccountOption": {
 					"option": "2",
-					"display_name": "Send Money",
-					"next_screen": "SendMoneyScreen"
-				},
-				"AirtimeOption": {
-					"option": "3",
-					"display_name": "Buy Airtime",
-					"next_screen": "AirtimeScreen"
+					"display_name": "Account",
+					"next_screen": "AccountScreen"
 				}
 			}
 		},
 		"DefaultNoneScreen": {
-			"text": "Thank you for using USSDETH",
+			"text": "Thank you for using M-ETH",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
 
         "ToNumberScreen": {
 			"text": "Enter Phone No.",
-			"screen_type": "Input",
-			"input_identifier": "to_phone_number",
+			"screen_type": "Function",
+			"function": "validate_phone_number",
 			"default_next_screen": "ToAmountScreen"
 		},
 		"ToAmountScreen": {
 			"text": "Amount",
-			"screen_type": "Input",
-			"input_identifier": "to_amount",
+			"screen_type": "Function",
+			"function": "validate_amount",
 			"default_next_screen": "PINScreen"
 		},
         "PINScreen": {
 			"text": "PIN",
-			"screen_type": "Input",
-			"input_identifier": "pin",
+			"screen_type": "Function",
+			"function": "validate_pin",
 			"default_next_screen": "CancelTXScreen"
 		},
         "CancelTXScreen": {
 			"text": "SENDING  2,622.36 ETH  to +10000.....,\ntransaction cost 3. Reply ANY INPUT to\ncancel transaction.",
-			"screen_type": "Input",
-			"input_identifier": "canceltx",
-			"default_next_screen": "CancelTXFxScreen"
-		},
-		"CancelTXFxScreen": {
-			"text": "Processing...",
 			"screen_type": "Function",
 			"function": "validate_canceltx",
-			"default_next_screen": "SendETHRouterScreen"
-		},
-		"SendETHRouterScreen": {
-			"text": "Selecting...",
-			"screen_type": "Router",
-			"router": "SendETHScreen",
-			"router_options": [
-				{
-					"router_option": "{{airtime.status == 'success'}}",
-					"next_screen": "SuccessScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'failed'}}",
-					"next_screen": "FailureScreen"
-				},
-				{
-					"router_option": "{{airtime.status == 'error'}}",
-					"next_screen": "FailureScreen"
-				}
-			],
-			"default_next_screen": "DefaultNoneScreen"
+			"default_next_screen": "SuccessScreen"
 		},
 		"SuccessScreen": {
 			"text": "Transaction Successful {{airtime.message}}",

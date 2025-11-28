@@ -1,3 +1,7 @@
+pub mod types;
+pub mod utils;
+
+
 // pub mod process;
 pub mod ussd_menu;
 // pub mod ussd_request;

@@ -77,11 +77,11 @@ pub fn send_eth(
     // Update session state to show transaction is processing
     let updated_session = USSDSession {
         current_screen: "transaction_processing".to_string(),
-        visited_screens: {
-            let mut visited = session.visited_screens;
-            visited.push(session.current_screen);
-            visited
-        },
+        // visited_screens: {
+        //     let mut visited = session.visited_screens;
+        //     visited.push(session.current_screen);
+        //     visited
+        // },
         last_interaction_time: ctx.timestamp,
         ..session
     };
