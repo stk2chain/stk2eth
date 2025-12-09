@@ -7,19 +7,41 @@ mod pin_validation_tests;
 mod swap_tests;
 mod ussdframework;
 
-use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Timestamp};
+use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 use anyhow::Result;
+
+use crate::ussdframework::utils::FUNCTION_MAP;
+
 use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
 mod controller;
 mod crypto;
 mod ethclient_wrapper;
 mod reducers;
+mod functions;
 
 pub use reducers::keys::{delete_user_key, fetch_user_key, store_user_key};
 pub use reducers::send_eth::send_eth;
 pub use reducers::validate_phone::map_phone_to_wallet;
 pub use reducers::validate_pin::validate_pin;
+pub use functions::register_functions;
+
+
+#[table(name = esim_profile)]
+pub struct EsimProfile {
+    #[primary_key]
+    #[unique]
+    phone_number: String,
+    #[unique]
+    wallet_address: String,
+    auth_hash: Option<String>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+}
+
+
+//TODO: Make it transient
+#[derive(Clone)]
 
 //if you want to call them via /call/<reducer>.
 
@@ -56,13 +78,13 @@ pub struct USSDSession {
     data: String,
 
     current_screen: String,
-    visited_screens: Vec<String>,
+    // visited_screens: Vec<String>,
     last_interaction_time: Timestamp,
 
-    end_session: bool,
-    #[unique]
-    sender: Identity,
-    online: bool,
+    // end_session: bool,
+    #[index(btree)]
+    client: Identity, //USSD Client identity
+    // online: bool,
     authenticated: bool,
 }
 
@@ -107,7 +129,7 @@ pub struct USSDMenu {
 }
 
 #[table(name = ussd_service)]
-pub struct USSDServiceRow {
+pub struct USSDService {
     #[primary_key]
     id: u64,
     ussd_menu: u64,
@@ -116,6 +138,35 @@ pub struct USSDServiceRow {
     function_url: Option<String>,
     data_key: String,
 }
+
+
+
+
+impl USSDService {
+    
+    fn load_function(&self) -> Box<dyn Fn(&str) -> Result<(), String> + '_> {
+        // Load the function from the registered functions
+        let func = FUNCTION_MAP
+            .lock()
+            .unwrap()
+            .get(&self.function_name)
+            .cloned();
+
+        match func {
+            Some(f) => {
+                log::info!("Function found: {}", self.function_name);
+                Box::new(f)
+            }
+            None => {
+                log::error!("Function not found: {}", self.function_name);
+                Box::new(|_input: &str| {
+                    Err(format!("Function '{}' not found", self.function_name))
+                })
+            }
+        }
+    }
+}
+
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum ScreenType {
@@ -140,20 +191,133 @@ impl From<ussd_screens::ScreenType> for ScreenType {
     }
 }
 
+#[derive(Clone)]
 #[table(name = ussd_screen)]
 pub struct USSDScreen {
     #[primary_key]
     id: u64,
-    #[index(btree)]
-    ussd_menu: u64,
-    text: String,
+    #[unique]
+    name: String,
     screen_type: ScreenType,
     default_next_screen: String,
     service_code: String,
+    #[index(btree)]
+    ussd_menu: u64,
+    text: String,
     function: Option<String>,
-    input_identifier: Option<String>,
-    name: String,
 }
+
+impl USSDScreen {
+    /// Displays a message corresponding to the screen type.
+    ///
+    /// The message construction depends on the type of screen:
+    /// - For an initial screen, no message is displayed.
+    /// - For a menu screen, the message concatenates the screen text with the menu items.
+    /// - For an input screen, the message comprises the screen text alone.
+    /// - For a function screen, the message comprises the screen text alone.
+    /// - For a router screen, no message is displayed.
+    pub fn display(&self, ctx: &ReducerContext) -> Option<String> {
+        match self.screen_type {
+            ScreenType::Router => None,
+            ScreenType::Quit => Some(format!("END {}", self.text.clone())),
+            ScreenType::Menu => Some(format!("CON {}", self.format_menu_screen(ctx))),
+            _ => Some(format!("CON {}", self.text.clone())),
+        }
+    }
+
+    fn format_menu_screen(&self, ctx: &ReducerContext) -> String {
+        let menu_items = self.get_sorted_menu_items(ctx);
+        
+        match menu_items.is_empty() {
+            true => format!("{}\nNo menu items found", self.text),
+            false => format!("{}{}", self.text, self.format_menu_items(&menu_items)),
+        }
+    }
+
+    fn get_sorted_menu_items(&self, ctx: &ReducerContext) -> Vec<USSDMenuItem> {
+        let mut items: Vec<_> = ctx.db.menu_item()
+            .screen()
+            .filter(self.id)
+            .collect();
+        
+        items.sort_by_key(|item| item.option.parse::<usize>().unwrap_or(0));
+        items
+    }
+
+    fn format_menu_items(&self, items: &[USSDMenuItem]) -> String {
+        items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| format!("\n{}. {}", item.option, item.display_name))
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    fn execute(&self, ctx: &ReducerContext, user_input: &str, session: USSDSession) -> USSDSession {
+        let input = user_input.trim();
+
+        let mut next_screen = session.current_screen.clone();
+
+        match self.screen_type {
+            ScreenType::Menu => {
+                if let Ok(default_next_screen) = self.execute_menu_selection(ctx, input) {
+                    next_screen = default_next_screen;
+                }
+            }
+            ScreenType::Function => {
+                if let Some(function_name) = &self.function {
+                    if let Ok(_) = self.execute_function_screen(ctx, input, function_name) {
+                        next_screen = self.default_next_screen.clone();
+                    }
+                }
+            }
+            _ => {
+                log::warn!("Screen type {:?} not supported by execute function", self.screen_type);
+            }
+        }
+
+        ctx.db.ussd_session().session_id().update(USSDSession {
+            current_screen: next_screen.clone(),
+            ..session
+        })
+
+    }
+
+    fn execute_menu_selection(&self, ctx: &ReducerContext, user_input: &str) -> Result<String, String> {
+        match user_input.parse::<usize>() {
+            Ok(option) => if option > 0 {
+                let menu_items = self.get_sorted_menu_items(ctx);
+                if let Some(selected_item) = menu_items.iter().find(|item| item.option == option.to_string()) {
+                    return Ok(selected_item.next_screen.clone());
+                } else {
+                    return Err(format!("Invalid menu option '{}' for screen '{}'", user_input, self.name));
+                }
+            } else {
+               return Err(format!("Invalid menu option '{}' for screen '{}'", user_input, self.name));
+            }
+            Err(_)=> return Err("Invalid menu option".to_string())
+        }
+        
+    }
+
+    fn execute_function_screen(&self, ctx: &ReducerContext, user_input: &str, function_name: &str) -> Result<(), String> {
+        let svc_opt = ctx.db.ussd_service().iter().find(|svc| {
+                svc.name == function_name || svc.data_key == function_name || svc.function_name == function_name
+            });
+                
+        if let Some(svc) = svc_opt {
+            let loaded_function = svc.load_function();
+            loaded_function(user_input)
+                    
+        } else {
+            return Err(format!("Function not found for screen '{}'", self.name))
+        }
+    }
+
+}
+
+
+
 
 #[table(name = menu_item)]
 pub struct USSDMenuItem {
@@ -161,11 +325,28 @@ pub struct USSDMenuItem {
     display_name: String,
     next_screen: String,
     name: String,
+    #[index(btree)]
     screen: u64,
 }
 
-#[derive(Clone)]
-#[table(name = swap)]
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+    Cancelled
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapType {
+    SendEth,
+    TokenSwap,
+    CashOut,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[table(name = swap, public)]
 pub struct Swap {
     #[primary_key]
     #[auto_inc]
@@ -187,21 +368,21 @@ pub struct Swap {
     pub swap_type: SwapType,
 }
 
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapStatus {
-    Pending,
-    Processing,
-    Completed,
-    Failed,
-    Cancelled,
-}
+// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+// pub enum SwapStatus {
+//     Pending,
+//     Processing,
+//     Completed,
+//     Failed,
+//     Cancelled,
+// }
 
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapType {
-    SendEth,
-    TokenSwap,
-    CashOut,
-}
+// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+// pub enum SwapType {
+//     SendEth,
+//     TokenSwap,
+//     CashOut,
+// }
 
 #[table(name = app_config)]
 pub struct AppConfig {
@@ -233,6 +414,15 @@ pub struct USSDRequest {
     status: String,
     created_by: Identity,
     created_at: Timestamp,
+}
+
+#[table(name = ussd_response, public)]
+pub struct USSDResponse {
+    #[primary_key]
+    session_id: String,
+    response_text: String,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 #[table(name = user_pin)]
@@ -269,13 +459,12 @@ pub fn init(ctx: &ReducerContext) {
         }
     };
 
-    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*4337#".to_string())
-    {
+    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*384*6086#".to_string()) {
         existing
     } else {
         ctx.db.ussd_menu().insert(USSDMenu {
             id: 0,
-            service_code: "*4337#".to_string(),
+            service_code: "*384*6086#".to_string(),
         })
     };
 
@@ -286,9 +475,9 @@ pub fn init(ctx: &ReducerContext) {
             text: screen.text,
             screen_type: screen.screen_type.into(),
             default_next_screen: screen.default_next_screen,
-            service_code: "*4337#".to_string(),
+            service_code: "*384*6086#".to_string(),
             function: screen.function,
-            input_identifier: screen.input_identifier,
+            // input_identifier: screen.input_identifier,
             name: name.to_string(),
         });
 
@@ -331,7 +520,7 @@ pub fn init(ctx: &ReducerContext) {
         }
         let new_service_id = max_service_id + 1;
 
-        ctx.db.ussd_service().insert(USSDServiceRow {
+        ctx.db.ussd_service().insert(USSDService {
             id: new_service_id,
             ussd_menu: menu.id,
             name: name.clone(),
@@ -339,36 +528,41 @@ pub fn init(ctx: &ReducerContext) {
             function_url: service.function_url.clone(),
             data_key: service.data_key.clone(),
         });
+
     }
-    log::info!("USSDGETH Initialized by {}!", ctx.sender);
+    
+    //Register all functions
+    register_functions();
+    
+    log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
 }
 
 /// Logs a message when a client connects.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
-    log::info!("Client Connected, {}!", ctx.sender);
+    log::info!("Client Connected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
 }
 
 /// Logs a message when a client disconnects.
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
-    if let Some(session_retrieved) = ctx.db.ussd_session().sender().find(ctx.sender) {
-        log::info!(
-            "Processing USSD for session: {}",
-            session_retrieved.session_id
-        );
-    } else {
-        log::warn!(
-            "Disconnect event for unknown user with identity {:?}@{:?}",
-            ctx.sender,
-            ctx.timestamp
-        );
-    }
+    // if let Some(session_retrieved) = ctx.db.ussd_session().client().find(ctx.sender) {
+    //     log::info!("Processing USSD for session: {}", session_retrieved.session_id);
+    // } else {
+    log::warn!("Client Disconnected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
+    // }
 }
 
-/// Retrieves an existing USSD session or creates a new one.
-#[reducer]
-pub fn get_or_create_session(
+
+fn _check_profile_exists(ctx: &ReducerContext, phone_number: String) -> Option<EsimProfile> {
+    ctx.db.esim_profile().phone_number().find(phone_number.clone())
+}
+
+fn _check_session_exists(ctx: &ReducerContext, session_id: String) -> Option<USSDSession> {
+    ctx.db.ussd_session().session_id().find(session_id.clone())
+}
+
+fn session_update_or_create(
     ctx: &ReducerContext,
     session_id: String,
     phone_number: String,
@@ -376,20 +570,21 @@ pub fn get_or_create_session(
     service_code: String,
     text: String,
     initial_screen: String,
-) {
-    if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        let updated_session = USSDSession {
-            phone_number,
-            network_code,
-            service_code,
+    session_retrieved: Option<USSDSession>,
+) -> USSDSession {
+    if let Some(session_retrieved) = session_retrieved {
+        ctx.db.ussd_session().session_id().update(USSDSession {
+            // phone_number,
+            // network_code,
+            // service_code,
             data: text,
-            current_screen: session_retrieved.current_screen.clone(),
-            sender: ctx.sender,
-            online: true,
+            // current_screen: session_retrieved.current_screen.clone(),
+            client: ctx.sender, //client identity
+            // online: true,
             last_interaction_time: ctx.timestamp,
+            // end_session: false,
             ..session_retrieved
-        };
-        ctx.db.ussd_session().session_id().update(updated_session);
+        })
     } else {
         ctx.db.ussd_session().insert(USSDSession {
             session_id,
@@ -398,162 +593,43 @@ pub fn get_or_create_session(
             service_code,
             data: text,
             current_screen: initial_screen,
-            sender: ctx.sender,
-            online: true,
+            client: ctx.sender, //client identity
             authenticated: false,
             last_interaction_time: ctx.timestamp,
-            visited_screens: Vec::new(),
-            end_session: false,
+        })
+    }
+}
+
+
+fn response_update_or_create(ctx: &ReducerContext, session_id: String, response_text: String){
+    if let Some(response_retrieved) = ctx.db.ussd_response().session_id().find(session_id.clone()) {
+        ctx.db.ussd_response().session_id().update(USSDResponse {
+            response_text: response_text.clone(),
+            updated_at: ctx.timestamp,
+            ..response_retrieved
+        });
+    } else {
+        ctx.db.ussd_response().insert(USSDResponse {
+            session_id,
+            response_text: response_text.clone(),
+            updated_at: ctx.timestamp,
+            created_at: ctx.timestamp,
         });
     }
 }
 
-/// Retrieves the name of the initial screen for the USSD service.
-pub fn get_initial_screen(ctx: &ReducerContext) -> String {
-    for screen in ctx.db.ussd_screen().iter() {
-        if let ScreenType::Initial = screen.screen_type {
-            return screen.name.clone();
-        }
-    }
-    "InitialScreen".to_string()
-}
 
-/// Executes the logic for the current screen of a given session.
-#[reducer]
-pub fn execute_screen(ctx: &ReducerContext, session_id: String, text: String) {
-    let session = match ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        Some(s) => s,
-        None => {
-            log::error!(
-                "execute_screen failed: Session not found for {}",
-                session_id
-            );
-            return;
-        }
-    };
-
-    let screen_def = match ctx
-        .db
-        .ussd_screen()
-        .iter()
-        .find(|s| s.name == session.current_screen)
-    {
-        Some(s) => s,
-        None => {
-            log::error!(
-                "execute_screen failed: Screen definition not found for {}",
-                session.current_screen
-            );
-            return;
-        }
-    };
-
-    match screen_def.screen_type.clone() {
-        ScreenType::Function => {
-            if let Some(func_name) = screen_def.function.clone() {
-                let svc_opt = ctx.db.ussd_service().iter().find(|svc| {
-                    svc.name == func_name
-                        || svc.data_key == func_name
-                        || svc.function_name == func_name
-                });
-
-                if let Some(svc) = svc_opt {
-                    if svc.function_name == "validate_canceltx" {
-                        validate_canceltx(ctx, session.session_id.clone(), text.clone());
-                    } else {
-                        let mut max_req_id: u64 = 0;
-                        for r in ctx.db.ussd_request().iter() {
-                            if r.id > max_req_id {
-                                max_req_id = r.id
-                            }
-                        }
-                        let new_req_id = max_req_id + 1;
-
-                        ctx.db.ussd_request().insert(USSDRequest {
-                            id: new_req_id,
-                            ussd_menu: svc.ussd_menu,
-                            session_id: session.session_id.clone(),
-                            raw_data: text.clone(),
-                            status: "queued".to_string(),
-                            created_by: ctx.sender,
-                            created_at: ctx.timestamp,
-                        });
-
-                        if svc.function_name == "send_eth" {
-                            // Inlined quick validation flow: call validate_amount reducer and map errors to screens
-                            let amount = text.clone();
-                            match crate::reducers::amount_validation::validate_amount(
-                                ctx,
-                                amount.clone(),
-                            ) {
-                                Ok(()) => {
-                                    // proceed to send_eth with placeholders (real flow would extract addresses)
-                                    let from_address =
-                                        "0x0000000000000000000000000000000000000000".to_string();
-                                    let to_address =
-                                        "0x0000000000000000000000000000000000000000".to_string();
-                                    send_eth(
-                                        ctx,
-                                        session.session_id.clone(),
-                                        from_address,
-                                        to_address,
-                                        amount,
-                                    );
-                                }
-                                Err(code) => {
-                                    // Map known error codes to quit screens
-                                    let screen_name = match code.as_str() {
-                                        "amount_too_low" => "AmountTooLowScreen",
-                                        "amount_invalid" => "AmountInvalidScreen",
-                                        _ => "FailureScreen",
-                                    };
-
-                                    let updated_session = USSDSession {
-                                        current_screen: screen_name.to_string(),
-                                        ..session
-                                    };
-                                    ctx.db.ussd_session().session_id().update(updated_session);
-                                    // We've routed to a quit/error screen; stop processing to avoid using the
-                                    // consumed `session` value afterwards.
-                                    return;
-                                }
-                            }
-                        }
-                        log::info!(
-                            "Enqueued USSDRequest {} for service {}",
-                            new_req_id,
-                            svc.name
-                        );
-                    }
-                } else {
-                    log::warn!("No service found for function {}", func_name);
-                }
-            }
-
-            let updated_session = USSDSession {
-                current_screen: screen_def.default_next_screen.clone(),
-                ..session
-            };
-            ctx.db.ussd_session().session_id().update(updated_session);
-        }
-
-        ScreenType::Quit => {
-            cleanup_session(ctx, session_id.clone());
-        }
-
-        _ => {
-            log::info!(
-                "Executing screen type: {:?} for session {}",
-                screen_def.screen_type,
-                session_id
-            );
-        }
+pub fn get_initial_screen(ctx: &ReducerContext, profile: Option<EsimProfile>) -> String {
+    if let Some(profile) = profile {
+        "MainScreen".to_string()
+    } else {
+        "RegisterScreen".to_string()
     }
 }
 
-/// Main entry point for handling incoming USSD requests.
+
 #[reducer]
-pub fn handle_ussd(
+pub fn process_ussd_step(
     ctx: &ReducerContext,
     session_id: String,
     phone_number: String,
@@ -562,37 +638,60 @@ pub fn handle_ussd(
     text: String,
 ) {
     if let Some(_menu) = ctx.db.ussd_menu().service_code().find(service_code.clone()) {
-        let initial_screen = get_initial_screen(ctx);
+        //Does phone number EsimProfile exist in DB?
 
-        get_or_create_session(
+        let _profile = _check_profile_exists(ctx, phone_number.clone());
+
+        let _session = _check_session_exists(ctx, session_id.clone());
+
+
+        // Handle USSD Session processing
+        //Get or create session
+        let mut current_session = session_update_or_create(
             ctx,
             session_id.clone(),
             phone_number,
             network_code,
             service_code,
             text.clone(),
-            initial_screen,
+            get_initial_screen(ctx, _profile),
+            _session.clone(),
         );
+        
+        // Handle USSD SCreen processing
+        let mut current_screen = ctx.db.ussd_screen().name().find(current_session.current_screen.clone());
+        
+        if _session.is_some() {    
+            // Execute screen logic
+            current_session = current_screen.clone().expect("Screen not found ::execute").execute(&ctx, &text, current_session.clone());
+        }
 
-        execute_screen(ctx, session_id, text);
+        // Update USSD Response
+        // Get updated current screen after execution
+        current_screen = ctx.db.ussd_screen().name().find(current_session.current_screen.clone());
+        let display_text = current_screen.clone().expect("Screen not found ::display").display(&ctx);
+        response_update_or_create(ctx, session_id.clone(), display_text.clone().expect("Display text not found"));
+
+        
     } else {
         log::warn!("Unknown Menu serviceCode {}", service_code);
     }
+    
 }
 
 /// Marks a USSD session as ended and offline.
-#[reducer]
-pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
-    if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        let updated_session = USSDSession {
-            online: false,
-            end_session: true,
-            ..session
-        };
-        ctx.db.ussd_session().session_id().update(updated_session);
-        log::info!("Session {} cleaned up.", session_id);
-    }
-}
+// #[reducer]
+// pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
+//     if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
+//         let updated_session = USSDSession {
+//             online: false,
+//             end_session: true,
+//             ..session
+//         };
+//         ctx.db.ussd_session().session_id().update(updated_session);
+//         log::info!("Session {} cleaned up.", session_id);
+//     }
+// }
 
 /// Validates a user's choice to either confirm or cancel a pending transaction.
 #[reducer]
@@ -618,6 +717,18 @@ pub fn validate_canceltx(ctx: &ReducerContext, session_id: String, input: String
 #[cfg(test)]
 mod tests {
     use super::*;
+// pub fn claim_swap(ctx: &ReducerContext, id: u64) {
+//     if let Some(s) = ctx.db.swap().id().find(id) {
+//         if let SwapStatus::Pending = s.status {
+//             let updated = Swap {
+//                 status: SwapStatus::Processing,
+//                 updated_at: ctx.timestamp,
+//                 ..s
+//             };
+//             ctx.db.swap().id().update(updated);
+//         }
+//     }
+// }
 
     #[allow(dead_code)]
     fn setup_common_test_db(ctx: &mut ReducerContext) {

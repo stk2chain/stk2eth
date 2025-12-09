@@ -73,7 +73,11 @@ pub fn send_eth(
 
     let updated_session = USSDSession {
         current_screen: "transaction_processing".to_string(),
-        visited_screens,
+        // visited_screens: {
+        //     let mut visited = session.visited_screens;
+        //     visited.push(session.current_screen);
+        //     visited
+        // },
         last_interaction_time: ctx.timestamp,
         ..session
     };
