@@ -13,7 +13,7 @@ use anyhow::Result;
 
 use crate::ussdframework::utils::FUNCTION_MAP;
 
-use ussdframework::{ScreenType as FrameworkScreenType, USSDMenu as FrameworkMenu};
+use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
 mod reducers;
 mod functions;
 pub use reducers::send_eth::send_eth;
@@ -52,6 +52,7 @@ pub struct USSDSession {
     #[index(btree)]
     client: Identity, //USSD Client identity
     // online: bool,
+    authenticated: bool,
 }
 
 #[table(name = eth_audit_logs)]
@@ -301,6 +302,7 @@ pub enum SwapStatus {
     Processing,
     Completed,
     Failed,
+    Cancelled
 }
 
 #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
@@ -310,6 +312,7 @@ pub enum SwapType {
     CashOut,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[table(name = swap, public)]
 pub struct Swap {
     #[primary_key]
@@ -332,21 +335,21 @@ pub struct Swap {
     pub swap_type: SwapType,
 }
 
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapStatus {
-    Pending,
-    Processing,
-    Completed,
-    Failed,
-    Cancelled,
-}
+// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+// pub enum SwapStatus {
+//     Pending,
+//     Processing,
+//     Completed,
+//     Failed,
+//     Cancelled,
+// }
 
-#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-pub enum SwapType {
-    SendEth,
-    TokenSwap,
-    CashOut,
-}
+// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+// pub enum SwapType {
+//     SendEth,
+//     TokenSwap,
+//     CashOut,
+// }
 
 #[table(name = app_config)]
 pub struct AppConfig {
@@ -387,6 +390,29 @@ pub struct USSDResponse {
     response_text: String,
     created_at: Timestamp,
     updated_at: Timestamp,
+}
+
+#[table(name = user_pin)]
+pub struct UserPIN {
+    #[primary_key]
+    #[index(btree)]
+    pub phone_number: String,
+    pub pin_hash: String,
+    pub salt: String,
+    pub attempts: u32,
+    pub locked: bool,
+    pub last_attempt_time: Option<Timestamp>,
+    pub lockout_until: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum PINValidationResult {
+    Success,
+    InvalidPIN,
+    AccountLocked,
+    UserNotFound,
 }
 
 #[spacetimedb::reducer(init)]
@@ -535,6 +561,7 @@ fn session_update_or_create(
             data: text,
             current_screen: initial_screen,
             client: ctx.sender, //client identity
+            authenticated: false,
             last_interaction_time: ctx.timestamp,
         })
     }
@@ -620,18 +647,18 @@ pub fn process_ussd_step(
 }
 
 /// Marks a USSD session as ended and offline.
-#[reducer]
-pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
-    if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-        let updated_session = USSDSession {
-            online: false,
-            end_session: true,
-            ..session
-        };
-        ctx.db.ussd_session().session_id().update(updated_session);
-        log::info!("Session {} cleaned up.", session_id);
-    }
-}
+// #[reducer]
+// pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
+//     if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
+//         let updated_session = USSDSession {
+//             online: false,
+//             end_session: true,
+//             ..session
+//         };
+//         ctx.db.ussd_session().session_id().update(updated_session);
+//         log::info!("Session {} cleaned up.", session_id);
+//     }
+// }
 
 /// Validates a user's choice to either confirm or cancel a pending transaction.
 #[reducer]
