@@ -22,7 +22,7 @@ pub struct EsimProfile {
     phone_number: String,
     #[unique]
     wallet_address: String,
-    esim_profile_hash: Option<String>,
+    auth_hash: Option<String>,
     created_at: Timestamp,
     updated_at: Timestamp,
 }
@@ -44,7 +44,7 @@ pub struct USSDSession {
     last_interaction_time: Timestamp,
 
     // end_session: bool,
-    #[unique]
+    #[index(btree)]
     client: Identity, //USSD Client identity
     // online: bool,
 }
@@ -106,7 +106,7 @@ pub struct USSDService {
 impl USSDService {
     
     fn load_function(&self) -> Box<dyn Fn(&str) -> Result<(), String> + '_> {
-        // Load the function from the functions_path
+        // Load the function from the registered functions
         let func = FUNCTION_MAP
             .lock()
             .unwrap()
@@ -166,7 +166,6 @@ pub struct USSDScreen {
     ussd_menu: u64,
     text: String,
     function: Option<String>,
-    //input_identifier: Option<String>,
 }
 
 impl USSDScreen {
@@ -181,8 +180,9 @@ impl USSDScreen {
     pub fn display(&self, ctx: &ReducerContext) -> Option<String> {
         match self.screen_type {
             ScreenType::Router => None,
-            ScreenType::Menu => Some(self.format_menu_screen(ctx)),
-            _ => Some(self.text.clone()),
+            ScreenType::Quit => Some(format!("END {}", self.text.clone())),
+            ScreenType::Menu => Some(format!("CON {}", self.format_menu_screen(ctx))),
+            _ => Some(format!("CON {}", self.text.clone())),
         }
     }
 
@@ -209,12 +209,12 @@ impl USSDScreen {
         items
             .iter()
             .enumerate()
-            .map(|(index, item)| format!("\n{}. {}", index + 1, item.display_name))
+            .map(|(index, item)| format!("\n{}. {}", item.option, item.display_name))
             .collect::<Vec<_>>()
             .join("")
     }
 
-    fn execute(&self, ctx: &ReducerContext, user_input: &str, session: USSDSession) {
+    fn execute(&self, ctx: &ReducerContext, user_input: &str, session: USSDSession) -> USSDSession {
         let input = user_input.trim();
 
         let mut next_screen = session.current_screen.clone();
@@ -227,7 +227,9 @@ impl USSDScreen {
             }
             ScreenType::Function => {
                 if let Some(function_name) = &self.function {
-                    self.execute_function_screen(ctx, input, function_name);
+                    if let Ok(_) = self.execute_function_screen(ctx, input, function_name) {
+                        next_screen = self.default_next_screen.clone();
+                    }
                 }
             }
             _ => {
@@ -238,7 +240,7 @@ impl USSDScreen {
         ctx.db.ussd_session().session_id().update(USSDSession {
             current_screen: next_screen.clone(),
             ..session
-        });
+        })
 
     }
 
@@ -303,7 +305,7 @@ pub enum SwapType {
     CashOut,
 }
 
-#[table(name = swap)]
+#[table(name = swap, public)]
 pub struct Swap {
     #[primary_key]
     #[auto_inc]
@@ -364,12 +366,12 @@ pub fn init(ctx: &ReducerContext) {
         }
     };
 
-    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*4337#".to_string()) {
+    let menu = if let Some(existing) = ctx.db.ussd_menu().service_code().find("*384*6086#".to_string()) {
         existing
     } else {
         ctx.db.ussd_menu().insert(USSDMenu {
             id: 0,
-            service_code: "*4337#".to_string(),
+            service_code: "*384*6086#".to_string(),
         })
     };
 
@@ -380,7 +382,7 @@ pub fn init(ctx: &ReducerContext) {
             text: screen.text,
             screen_type: screen.screen_type.into(),
             default_next_screen: screen.default_next_screen,
-            service_code: "*4337#".to_string(),
+            service_code: "*384*6086#".to_string(),
             function: screen.function,
             // input_identifier: screen.input_identifier,
             name: name.to_string(),
@@ -446,11 +448,11 @@ pub fn identity_connected(ctx: &ReducerContext) {
 
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
-    if let Some(session_retrieved) = ctx.db.ussd_session().client().find(ctx.sender) {
-        log::info!("Processing USSD for session: {}", session_retrieved.session_id);
-    } else {
-        log::warn!("Client Disconnected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
-    }
+    // if let Some(session_retrieved) = ctx.db.ussd_session().client().find(ctx.sender) {
+    //     log::info!("Processing USSD for session: {}", session_retrieved.session_id);
+    // } else {
+    log::warn!("Client Disconnected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
+    // }
 }
 
 
@@ -546,7 +548,7 @@ pub fn process_ussd_step(
 
         // Handle USSD Session processing
         //Get or create session
-        let current_session = session_update_or_create(
+        let mut current_session = session_update_or_create(
             ctx,
             session_id.clone(),
             phone_number,
@@ -562,12 +564,13 @@ pub fn process_ussd_step(
         
         if _session.is_some() {    
             // Execute screen logic
-            current_screen.clone().expect("Screen not found").execute(&ctx, &text, current_session);
+            current_session = current_screen.clone().expect("Screen not found ::execute").execute(&ctx, &text, current_session.clone());
         }
 
         // Update USSD Response
-        // TODO: Get updated current screen after execution
-        let display_text = current_screen.clone().expect("Screen not found").display(&ctx);
+        // Get updated current screen after execution
+        current_screen = ctx.db.ussd_screen().name().find(current_session.current_screen.clone());
+        let display_text = current_screen.clone().expect("Screen not found ::display").display(&ctx);
         response_update_or_create(ctx, session_id.clone(), display_text.clone().expect("Display text not found"));
 
         
