@@ -1,118 +1,131 @@
-# Multi-stage Dockerfile for STK2ETH Production
-# Builds ussdclient and ethclient binaries
+# Dockerfile — production-ready multi-stage build for STK2ETH
+# Builds ussdclient and ethclient release binaries and provides
+# small runtime images for each service and an all-in-one dev image.
+
+# ============================================================================
+# Stage 0: Build deps (cache layer for cargo registry / dependencies)
+# ============================================================================
+FROM rustlang/rust:nightly-bookworm AS planner
+WORKDIR /app
+
+# Copy only manifests to leverage layer caching for dependencies
+COPY Cargo.toml Cargo.lock ./
+# Also copy crate-level Cargo files if present
+COPY ussdclient/Cargo.toml ussdclient/Cargo.toml
+COPY ethclient/Cargo.toml ethclient/Cargo.toml
+COPY ussdgeth/Cargo.toml ussdgeth/Cargo.toml
+
+# Create a dummy target to download dependencies
+RUN mkdir -p src && echo "fn main(){}" > src/main.rs
+RUN cargo fetch --locked || true
 
 # ============================================================================
 # Stage 1: Build Stage
 # ============================================================================
-FROM rust:1.83-slim-bookworm AS builder
+FROM rustlang/rust:nightly-bookworm AS builder
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies needed for some crates (openssl, musl if needed)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
+    ca-certificates \
     musl-tools \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy workspace files
+# Copy manifests and source tree (workspace)
 COPY Cargo.toml Cargo.lock ./
 COPY ussdclient ./ussdclient
 COPY ethclient ./ethclient
+COPY ussdgeth ./ussdgeth
+# Copy any top-level files needed for build
+# Copy Cargo config if exists
+RUN if [ -d ".cargo" ]; then cp -r .cargo /app/.cargo; fi
+#COPY .cargo ./.cargo || true
 
-# Build release binaries with optimizations
-RUN cargo build --release --workspace
+# Build release binaries for the workspace
+RUN cargo build --release --workspace --locked
 
 # Strip binaries to reduce size
-RUN strip target/release/ussdclient target/release/ethclient
+# (if strip not available in image, the command will be skipped)
+RUN command -v strip >/dev/null 2>&1 && \
+    strip target/release/ussdclient || true && \
+    strip target/release/ethclient || true
 
 # ============================================================================
-# Stage 2: Runtime Stage for USSD Client
+# Stage 2: Runtime image for USSD client (small, non-root)
 # ============================================================================
-FROM debian:bookworm-slim AS ussdclient
+FROM debian:bookworm-slim AS ussd-runtime
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# runtime deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
+# non-root user
 RUN groupadd -r ussd && useradd -r -g ussd ussd
 
 WORKDIR /app
 
-# Copy binary from builder
+# copy binary built earlier
 COPY --from=builder /app/target/release/ussdclient /usr/local/bin/ussdclient
 
-# Set ownership
-RUN chown -R ussd:ussd /app
+# ownership & permissions
+RUN chown ussd:ussd /usr/local/bin/ussdclient && chmod 0755 /usr/local/bin/ussdclient
 
-# Switch to non-root user
 USER ussd
 
-# Expose USSD client port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -fsS --max-time 2 http://127.0.0.1:8080/health || exit 1
 
-# Run the application
-CMD ["ussdclient"]
+ENTRYPOINT ["/usr/local/bin/ussdclient"]
 
 # ============================================================================
-# Stage 3: Runtime Stage for ETH Client
+# Stage 3: Runtime image for ETH client (small, non-root)
 # ============================================================================
-FROM debian:bookworm-slim AS ethclient
+FROM debian:bookworm-slim AS eth-runtime
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
 RUN groupadd -r eth && useradd -r -g eth eth
 
 WORKDIR /app
 
-# Copy binary from builder
 COPY --from=builder /app/target/release/ethclient /usr/local/bin/ethclient
 
-# Set ownership
-RUN chown -R eth:eth /app
+RUN chown eth:eth /usr/local/bin/ethclient && chmod 0755 /usr/local/bin/ethclient
 
-# Switch to non-root user
 USER eth
 
-# Run the application
-CMD ["ethclient"]
+ENTRYPOINT ["/usr/local/bin/ethclient"]
 
 # ============================================================================
-# Stage 4: All-in-One Stage (for development/testing)
+# Stage 4: All-in-one image (for testing / small deployments)
 # ============================================================================
 FROM debian:bookworm-slim AS all-in-one
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
 RUN groupadd -r stk2eth && useradd -r -g stk2eth stk2eth
 
 WORKDIR /app
 
-# Copy binaries from builder
 COPY --from=builder /app/target/release/ussdclient /usr/local/bin/ussdclient
 COPY --from=builder /app/target/release/ethclient /usr/local/bin/ethclient
 
-# Create supervisor config
 RUN mkdir -p /etc/supervisor/conf.d
-COPY <<EOF /etc/supervisor/conf.d/stk2eth.conf
+COPY <<'EOF' /etc/supervisor/conf.d/stk2eth.conf
 [supervisord]
 nodaemon=true
 user=root
@@ -140,15 +153,11 @@ stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 EOF
 
-# Set ownership
-RUN chown -R stk2eth:stk2eth /app
+RUN chown -R stk2eth:stk2eth /usr/local/bin/ussdclient /usr/local/bin/ethclient
 
-# Expose USSD client port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -fsS --max-time 2 http://127.0.0.1:8080/health || exit 1
 
-# Run supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

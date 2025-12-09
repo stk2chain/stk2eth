@@ -14,9 +14,16 @@ use anyhow::Result;
 use crate::ussdframework::utils::FUNCTION_MAP;
 
 use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
+mod controller;
+mod crypto;
+mod ethclient_wrapper;
 mod reducers;
 mod functions;
+
+pub use reducers::keys::{delete_user_key, fetch_user_key, store_user_key};
 pub use reducers::send_eth::send_eth;
+pub use reducers::validate_phone::map_phone_to_wallet;
+pub use reducers::validate_pin::validate_pin;
 pub use functions::register_functions;
 
 
@@ -35,6 +42,32 @@ pub struct EsimProfile {
 
 //TODO: Make it transient
 #[derive(Clone)]
+
+//if you want to call them via /call/<reducer>.
+
+#[table(name = phone_wallet)]
+pub struct PhoneWallet {
+    /// E.164 phone number (primary key)
+    #[primary_key]
+    pub phone_number: String,
+
+    /// Ethereum wallet address (0x...)
+    pub wallet_address: String,
+
+    /// Creation time
+    pub created_at: Timestamp,
+
+    /// Last update time
+    pub updated_at: Timestamp,
+}
+#[table(name = user_key)]
+pub struct UserKey {
+    #[primary_key]
+    pub phone_number: String,
+    pub encrypted_key: String,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
 #[table(name = ussd_session)]
 pub struct USSDSession {
     #[primary_key]
