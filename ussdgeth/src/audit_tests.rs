@@ -2,9 +2,9 @@
 mod audit_log_tests {
     use crate::EthAuditLog;
 
+    /// Test that audit log data structures are valid
     #[test]
     fn test_audit_log_data_validation() {
-        // Test that audit log data structures are valid
         let audit_log = EthAuditLog {
             id: 1,
             tx_hash: "0x1234567890abcdef".to_string(),
@@ -31,7 +31,6 @@ mod audit_log_tests {
             is_immutable: true,
         };
 
-        // Validate basic fields
         assert_eq!(audit_log.tx_hash, "0x1234567890abcdef");
         assert_eq!(audit_log.amount, "1000000000000000000");
         assert_eq!(audit_log.phone_number, "+254712345678");
@@ -39,24 +38,22 @@ mod audit_log_tests {
         assert_eq!(audit_log.compliance_status, "pending");
     }
 
+    /// Test Ethereum address validation logic
     #[test]
     fn test_address_validation() {
-        // Test Ethereum address validation logic
         let valid_address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0";
         let invalid_address = "invalid_address";
 
-        // Valid address should be 42 characters (0x + 40 hex chars)
         assert_eq!(valid_address.len(), 42);
         assert!(valid_address.starts_with("0x"));
 
-        // Invalid address should not match format
         assert_ne!(invalid_address.len(), 42);
         assert!(!invalid_address.starts_with("0x"));
     }
 
+    /// Test FATF travel rule compliance data structure
     #[test]
     fn test_fatf_compliance_data_structure() {
-        // Test FATF travel rule compliance data structure
         let fatf_log = EthAuditLog {
             id: 1,
             tx_hash: "0xabcdef123456".to_string(),
@@ -83,7 +80,6 @@ mod audit_log_tests {
             is_immutable: true,
         };
 
-        // Validate FATF compliance fields
         assert!(fatf_log.originator_name.is_some());
         assert!(fatf_log.beneficiary_name.is_some());
         assert!(fatf_log.originator_country.is_some());
@@ -93,70 +89,76 @@ mod audit_log_tests {
         assert_eq!(fatf_log.compliance_status, "compliant");
     }
 
+    /// Test phone number format validation
     #[test]
     fn test_phone_number_validation() {
-        // Test phone number format validation
-        let valid_phones = vec![
-            "+254712345678",
-            "+1234567890",
-            "+44123456789"
-        ];
+        let _valid_phones = vec!["+254792281871", "+1234567890", "+44123456789"];
 
-        let invalid_phones = vec![
-            "254712345678",      // Missing +
-            "+254712345678901",  // Too long (16 chars > 15)
-            "+254abc123",        // Contains letters
-            "+254123",           // Too short (8 chars < 10)
-            ""                   // Empty
-        ];
+        // Test phone number format validation
+        let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];
 
         for phone in valid_phones {
             assert!(phone.starts_with("+"));
             assert!(phone.len() >= 10);
             assert!(phone.len() <= 15);
+            // Only one leading plus allowed
+            assert_eq!(
+                phone.chars().take_while(|&c| c == '+').count(),
+                1,
+                "Phone '{}' should have only one leading plus",
+                phone
+            );
         }
 
+        let invalid_phones = vec![
+            "254712345678",        // missing '+'
+            "+2547",               // too short
+            "+254712345678901234", // too long
+            "+2547abc45678",       // contains letters
+            "",                    // empty
+            "++254712345678",      // double plus
+        ];
+
         for phone in invalid_phones {
-            // Each invalid phone should fail at least one validation criteria
             let has_plus = phone.starts_with("+");
             let correct_length = phone.len() >= 10 && phone.len() <= 15;
             let only_digits_and_plus = phone.chars().all(|c| c.is_ascii_digit() || c == '+');
             let not_empty = !phone.is_empty();
+            let single_leading_plus = phone.chars().take_while(|&c| c == '+').count() == 1;
 
-            let is_valid = has_plus && correct_length && only_digits_and_plus && not_empty;
+            let is_valid = has_plus
+                && correct_length
+                && only_digits_and_plus
+                && not_empty
+                && single_leading_plus;
 
-            assert!(!is_valid, "Phone '{}' (len={}) should be invalid", phone, phone.len());
+            assert!(
+                !is_valid,
+                "Phone '{}' (len={}) should be invalid",
+                phone,
+                phone.len()
+            );
         }
     }
 
+    /// Test transaction amount validation
     #[test]
     fn test_transaction_amount_validation() {
-        // Test transaction amount validation
-        let valid_amounts = vec![
-            "1000000000000000000",    // 1 ETH in wei
-            "500000000000000000",     // 0.5 ETH
-            "1",                      // 1 wei
-        ];
+        let valid_amounts = vec!["1000000000000000000", "500000000000000000", "1"];
 
-        let invalid_amounts = vec![
-            "0",                      // Zero amount
-            "-1000000000000000000",   // Negative amount
-            "abc123",                 // Non-numeric
-            "",                       // Empty
-        ];
-
+        let invalid_amounts = vec!["0", "-1000000000000000000", "abc123", ""];
         for amount in valid_amounts {
             assert!(!amount.is_empty());
-            assert!(amount.parse::<u64>().is_ok() || amount.len() > 19); // Handle large numbers
+            assert!(amount.parse::<u64>().is_ok() || amount.len() > 19);
             assert!(amount != "0");
         }
 
         for amount in invalid_amounts {
             assert!(
-                amount.is_empty() ||
-                amount == "0" ||
-                amount.starts_with("-") ||
-                amount.parse::<u64>().is_err()
+                amount.is_empty()
+                    || amount == "0"
+                    || amount.starts_with("-")
+                    || amount.parse::<u64>().is_err()
             );
         }
     }

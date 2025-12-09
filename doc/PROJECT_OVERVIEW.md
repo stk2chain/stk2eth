@@ -199,7 +199,7 @@ Follow conventional commits:
 
 ### Contributing
 
-Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Please read [CONTRIBUTING.md](../CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## 📚 Documentation Structure
 
@@ -269,5 +269,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**For detailed technical specifications, see [README.md](./README.md)**
+**For detailed technical specifications, see [README.md](../README.md)**
 **For component-specific documentation, see individual component README files**

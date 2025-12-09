@@ -1,0 +1,76 @@
+# Git
+.git
+.gitignore
+.githooks
+.github
+
+# Rust build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock (keep for reproducible builds)
+# Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.claude/
+
+# Documentation
+*.md
+!README.md
+doc/
+docs/
+
+# Tests
+tests/
+**/*_test.rs
+**/*.test.*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Contract artifacts (not needed for runtime)
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+
+# Scripts
+scripts/
+*.sh
+!docker-entrypoint.sh
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Coverage reports
+*.profraw
+*.profdata
+lcov.info
+coverage/
+
+# Benchmarks
+criterion/

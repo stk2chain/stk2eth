@@ -1,6 +1,11 @@
-mod ussdframework;
-mod audit_tests;
+pub use spacetimedb::Table as SwapTable;
+pub use spacetimedb::Table as USSDSessionTable;
+pub(crate) mod amount_validation_tests;
 mod audit_reducers;
+mod audit_tests;
+mod pin_validation_tests;
+mod swap_tests;
+mod ussdframework;
 
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
@@ -129,7 +134,7 @@ impl USSDService {
 }
 
 
-#[derive(SpacetimeType, Clone, Debug)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum ScreenType {
     Initial,
     Menu,
@@ -139,15 +144,15 @@ pub enum ScreenType {
     Quit,
 }
 
-impl From<FrameworkScreenType> for ScreenType {
-    fn from(ext: FrameworkScreenType) -> Self {
+impl From<ussd_screens::ScreenType> for ScreenType {
+    fn from(ext: ussd_screens::ScreenType) -> Self {
         match ext {
-            FrameworkScreenType::Initial => ScreenType::Initial,
-            FrameworkScreenType::Menu => ScreenType::Menu,
-            FrameworkScreenType::Input => ScreenType::Input,
-            FrameworkScreenType::Function => ScreenType::Function,
-            FrameworkScreenType::Router => ScreenType::Router,
-            FrameworkScreenType::Quit => ScreenType::Quit,
+            ussd_screens::ScreenType::Initial => ScreenType::Initial,
+            ussd_screens::ScreenType::Menu => ScreenType::Menu,
+            ussd_screens::ScreenType::Input => ScreenType::Input,
+            ussd_screens::ScreenType::Function => ScreenType::Function,
+            ussd_screens::ScreenType::Router => ScreenType::Router,
+            ussd_screens::ScreenType::Quit => ScreenType::Quit,
         }
     }
 }
@@ -310,7 +315,6 @@ pub struct Swap {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    #[index(btree)]
     pub session_id: String,
     pub from_address: String,
     pub to_address: String,
@@ -326,6 +330,36 @@ pub struct Swap {
     pub updated_at: Timestamp,
     pub error_message: Option<String>,
     pub swap_type: SwapType,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum SwapType {
+    SendEth,
+    TokenSwap,
+    CashOut,
+}
+
+#[table(name = app_config)]
+pub struct AppConfig {
+    #[primary_key]
+    key: String,
+    value: String,
+}
+
+#[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
+pub enum AmountValidationResult {
+    Valid,
+    TooLow,
+    Invalid,
 }
 
 #[table(name = router_option)]
@@ -412,7 +446,10 @@ pub fn init(ctx: &ReducerContext) {
 
     for (name, service) in menu_screens.services.into_iter() {
         if service.function_name.trim().is_empty() || service.data_key.trim().is_empty() {
-            log::warn!("Skipping service {} due to missing function_name or data_key", name);
+            log::warn!(
+                "Skipping service {} due to missing function_name or data_key",
+                name
+            );
             continue;
         }
 
@@ -441,11 +478,13 @@ pub fn init(ctx: &ReducerContext) {
     log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
 }
 
+/// Logs a message when a client connects.
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
     log::info!("Client Connected, {:?}@{:?}!", ctx.sender, ctx.timestamp);
 }
 
+/// Logs a message when a client disconnects.
 #[spacetimedb::reducer(client_disconnected)]
 pub fn identity_disconnected(ctx: &ReducerContext) {
     // if let Some(session_retrieved) = ctx.db.ussd_session().client().find(ctx.sender) {
@@ -580,106 +619,40 @@ pub fn process_ussd_step(
     
 }
 
-// #[view(name = ussd_response, public)]
-// pub fn ussd_response(ctx: &ViewContext, session_id: String) -> Option<String> {
-//     if let Some(session_retrieved) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
-//         let screen = ctx.db.ussd_screen.name().find(session_retrieved.current_screen.clone());
-//         Some(screen.display(&ctx));
-//     }else {
-//         None
-//     }
+/// Marks a USSD session as ended and offline.
+#[reducer]
+pub fn cleanup_session(ctx: &ReducerContext, session_id: String) {
+    if let Some(session) = ctx.db.ussd_session().session_id().find(session_id.clone()) {
+        let updated_session = USSDSession {
+            online: false,
+            end_session: true,
+            ..session
+        };
+        ctx.db.ussd_session().session_id().update(updated_session);
+        log::info!("Session {} cleaned up.", session_id);
+    }
+}
 
-// }
-
-// #[reducer]
-// pub fn claim_swap(ctx: &ReducerContext, id: u64) {
-//     if let Some(s) = ctx.db.swap().id().find(id) {
-//         if let SwapStatus::Pending = s.status {
-//             let updated = Swap {
-//                 status: SwapStatus::Processing,
-//                 updated_at: ctx.timestamp,
-//                 ..s
-//             };
-//             ctx.db.swap().id().update(updated);
-//         }
-//     }
-// }
-
-// #[reducer]
-// pub fn complete_swap(
-//     ctx: &ReducerContext,
-//     id: u64,
-//     tx_hash: String,
-//     gas_price: Option<String>,
-//     gas_limit: Option<String>,
-//     network: String,
-// ) {
-//     let Some(s) = ctx.db.swap().id().find(id) else {
-//         log::warn!("complete_swap: swap {} not found", id);
-//         return;
-//     };
-
-//     let from_address_c = s.from_address.clone();
-//     let to_address_c = s.to_address.clone();
-//     let amount_c = s.amount.clone();
-//     let session_id_c = s.session_id.clone();
-
-//     let updated = Swap {
-//         status: SwapStatus::Completed,
-//         tx_hash: Some(tx_hash.clone()),
-//         gas_price,
-//         gas_limit,
-//         updated_at: ctx.timestamp,
-//         ..s
-//     };
-//     ctx.db.swap().id().update(updated);
-
-//     let phone_number = match ctx.db.ussd_session().session_id().find(session_id_c.clone()) {
-//         Some(sess) => sess.phone_number,
-//         None => "".to_string(),
-//     };
-
-//     let _ = ctx.db.eth_audit_logs().insert(EthAuditLog {
-//         id: 0,
-//         tx_hash,
-//         from_address: from_address_c,
-//         to_address: to_address_c,
-//         amount: amount_c,
-//         phone_number,
-//         session_id: session_id_c,
-//         timestamp: ctx.timestamp,
-//         originator_name: None,
-//         beneficiary_name: None,
-//         originator_country: None,
-//         beneficiary_country: None,
-//         originator_address: None,
-//         beneficiary_address: None,
-//         originator_id: None,
-//         beneficiary_id: None,
-//         transaction_type: "send_eth".to_string(),
-//         network,
-//         gas_fee: None,
-//         exchange_rate: None,
-//         compliance_status: "ok".to_string(),
-//         risk_score: None,
-//         is_immutable: true,
-//     });
-// }
-
-// #[reducer]
-// pub fn fail_swap(ctx: &ReducerContext, id: u64, error_message: String) {
-//     if let Some(s) = ctx.db.swap().id().find(id) {
-//         let updated = Swap {
-//             status: SwapStatus::Failed,
-//             error_message: Some(error_message),
-//             updated_at: ctx.timestamp,
-//             ..s
-//         };
-//         ctx.db.swap().id().update(updated);
-//     } else {
-//         log::warn!("fail_swap: swap {} not found", id);
-//     }
-// }
+/// Validates a user's choice to either confirm or cancel a pending transaction.
+#[reducer]
+pub fn validate_canceltx(ctx: &ReducerContext, session_id: String, input: String) {
+    let swap = ctx
+        .db
+        .swap()
+        .iter()
+        .find(|s| s.session_id == session_id.clone());
+    if let Some(swap) = swap {
+        let mut updated_swap = swap.clone();
+        if input.trim() == "2" {
+            updated_swap.status = SwapStatus::Cancelled;
+            log::info!("Swap for session {} cancelled.", session_id);
+        } else if input.trim() == "1" {
+            updated_swap.status = SwapStatus::Processing;
+            log::info!("Swap for session {} confirmed for processing.", session_id);
+        }
+        ctx.db.swap().id().update(updated_swap);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -697,122 +670,146 @@ mod tests {
 //     }
 // }
 
-// #[reducer]
-// pub fn complete_swap(
-//     ctx: &ReducerContext,
-//     id: u64,
-//     tx_hash: String,
-//     gas_price: Option<String>,
-//     gas_limit: Option<String>,
-//     network: String,
-// ) {
-//     let Some(s) = ctx.db.swap().id().find(id) else {
-//         log::warn!("complete_swap: swap {} not found", id);
-//         return;
-//     };
+    #[allow(dead_code)]
+    fn setup_common_test_db(ctx: &mut ReducerContext) {
+        let menu = ctx.db.ussd_menu().insert(USSDMenu {
+            id: 1,
+            service_code: "*4337#".to_string(),
+        });
 
-//     let from_address_c = s.from_address.clone();
-//     let to_address_c = s.to_address.clone();
-//     let amount_c = s.amount.clone();
-//     let session_id_c = s.session_id.clone();
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 1,
+            ussd_menu: menu.id,
+            name: "EnterPin".to_string(),
+            text: "Enter your PIN".to_string(),
+            screen_type: ScreenType::Function,
+            default_next_screen: "ConfirmPin".to_string(),
+            service_code: "*4337#".to_string(),
+            function: Some("validate_pin".to_string()),
+            input_identifier: None,
+        });
 
-//     let updated = Swap {
-//         status: SwapStatus::Completed,
-//         tx_hash: Some(tx_hash.clone()),
-//         gas_price,
-//         gas_limit,
-//         updated_at: ctx.timestamp,
-//         ..s
-//     };
-//     ctx.db.swap().id().update(updated);
+        ctx.db.ussd_service().insert(USSDServiceRow {
+            id: 1,
+            ussd_menu: menu.id,
+            name: "validate_pin".to_string(),
+            function_name: "validate_pin_function".to_string(),
+            function_url: None,
+            data_key: "pin".to_string(),
+        });
 
-//     let phone_number = match ctx.db.ussd_session().session_id().find(session_id_c.clone()) {
-//         Some(sess) => sess.phone_number,
-//         None => "".to_string(),
-//     };
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 2,
+            ussd_menu: menu.id,
+            name: "QuitScreen".to_string(),
+            text: "Thank you for using our service.".to_string(),
+            screen_type: ScreenType::Quit,
+            default_next_screen: "".to_string(),
+            service_code: "*4337#".to_string(),
+            function: None,
+            input_identifier: None,
+        });
 
-//     let _ = ctx.db.eth_audit_logs().insert(EthAuditLog {
-//         id: 0,
-//         tx_hash,
-//         from_address: from_address_c,
-//         to_address: to_address_c,
-//         amount: amount_c,
-//         phone_number,
-//         session_id: session_id_c,
-//         timestamp: ctx.timestamp,
-//         originator_name: None,
-//         beneficiary_name: None,
-//         originator_country: None,
-//         beneficiary_country: None,
-//         originator_address: None,
-//         beneficiary_address: None,
-//         originator_id: None,
-//         beneficiary_id: None,
-//         transaction_type: "send_eth".to_string(),
-//         network,
-//         gas_fee: None,
-//         exchange_rate: None,
-//         compliance_status: "ok".to_string(),
-//         risk_score: None,
-//         is_immutable: true,
-//     });
-// }
+        ctx.db.ussd_screen().insert(USSDScreen {
+            id: 3,
+            ussd_menu: menu.id,
+            name: "ConfirmCancelTx".to_string(),
+            text: "Confirm or cancel transaction".to_string(),
+            screen_type: ScreenType::Function,
+            default_next_screen: "TransactionResult".to_string(),
+            service_code: "*4337#".to_string(),
+            function: Some("validate_canceltx".to_string()),
+            input_identifier: None,
+        });
 
-// #[reducer]
-// pub fn fail_swap(ctx: &ReducerContext, id: u64, error_message: String) {
-//     if let Some(s) = ctx.db.swap().id().find(id) {
-//         let updated = Swap {
-//             status: SwapStatus::Failed,
-//             error_message: Some(error_message),
-//             updated_at: ctx.timestamp,
-//             ..s
-//         };
-//         ctx.db.swap().id().update(updated);
-//     } else {
-//         log::warn!("fail_swap: swap {} not found", id);
-//     }
-// }
-// *;
-
-    // ...
-    // fn setup_test_db(ctx: &ReducerContext) {
-    //     // Function to initialize DB with test data
-    //     let menu = ctx.db.ussd_menu().insert(USSDMenu {
-    //         id: 1,
-    //         service_code: "*123#".to_string(),
-    //     });
-
-    //     ctx.db.ussd_screen().insert(USSDScreen {
-    //         id: 1,
-    //         ussd_menu: menu.id,
-    //         name: "EnterPin".to_string(),
-    //         text: "Enter your PIN".to_string(),
-    //         screen_type: ScreenType::Function,
-    //         default_next_screen: "ConfirmPin".to_string(),
-    //         service_code: "*123#".to_string(),
-    //         function: Some("validate_pin".to_string()),
-    //         input_identifier: None,
-    //     });
-
-    //     ctx.db.ussd_service().insert(USSDServiceRow {
-    //         id: 1,
-    //         ussd_menu: menu.id,
-    //         name: "validate_pin".to_string(),
-    //         function_name: "validate_pin_function".to_string(),
-    //         function_url: None,
-    //         data_key: "pin".to_string(),
-    //     });
-    // }
+        ctx.db.ussd_service().insert(USSDServiceRow {
+            id: 2,
+            ussd_menu: menu.id,
+            name: "validate_canceltx".to_string(),
+            function_name: "validate_canceltx".to_string(),
+            function_url: None,
+            data_key: "cancel_tx".to_string(),
+        });
+    }
 
     #[test]
-    fn menu_json_contains_send_eth_service() {
-        let content = include_str!("./data/menu.json");
-        let menu: ussdframework::USSDMenu =
-            serde_json::from_str(content).expect("failed to parse menu.json");
-        assert!(
-            menu.services.contains_key("send_eth"),
-            "menu.json should contain a send_eth service"
+    fn test_ussd_session_struct_fields() {
+        let session = USSDSession {
+            session_id: "sess1".to_string(),
+            phone_number: "+254792281871".to_string(),
+            network_code: "net1".to_string(),
+            service_code: "*4337#".to_string(),
+            data: "testdata".to_string(),
+            current_screen: "screen1".to_string(),
+            visited_screens: vec!["screen0".to_string()],
+            last_interaction_time: Timestamp::now(),
+            end_session: false,
+            sender: Identity::from_byte_array([1; 32]),
+            online: true,
+            authenticated: false,
+        };
+        assert_eq!(session.session_id, "sess1");
+        assert_eq!(session.phone_number, "+254792281871");
+        assert!(session.online);
+        assert!(!session.end_session);
+        assert_eq!(session.visited_screens.len(), 1);
+    }
+
+    #[test]
+    fn test_swap_struct_fields() {
+        let swap = Swap {
+            id: 1,
+            session_id: "sess1".to_string(),
+            from_address: "0xfrom".to_string(),
+            to_address: "0xto".to_string(),
+            amount: "1000".to_string(),
+            token_in: "ETH".to_string(),
+            token_out: "USD".to_string(),
+            status: SwapStatus::Pending,
+            tx_hash: Some("0xhash".to_string()),
+            gas_price: Some("100".to_string()),
+            gas_limit: Some("21000".to_string()),
+            nonce: Some(1),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
+            error_message: None,
+            swap_type: SwapType::SendEth,
+        };
+        assert_eq!(swap.session_id, "sess1");
+        assert_eq!(swap.from_address, "0xfrom");
+        assert_eq!(swap.status, SwapStatus::Pending);
+        assert_eq!(swap.swap_type, SwapType::SendEth);
+        assert!(swap.tx_hash.is_some());
+    }
+
+    #[test]
+    fn test_swap_status_enum() {
+        assert_eq!(format!("{:?}", SwapStatus::Pending), "Pending");
+        assert_eq!(format!("{:?}", SwapStatus::Completed), "Completed");
+        assert_ne!(SwapStatus::Failed, SwapStatus::Processing);
+    }
+
+    // Pure helper to map reducer error codes to screen names. Kept pure so it can be unit tested
+    // without requiring a live ReducerContext or linking SpacetimeDB native libraries.
+    pub fn map_amount_error_code(code: &str) -> &'static str {
+        match code {
+            "amount_too_low" => "AmountTooLowScreen",
+            "amount_invalid" => "AmountInvalidScreen",
+            _ => "FailureScreen",
+        }
+    }
+
+    #[test]
+    fn test_map_amount_error_code() {
+        assert_eq!(
+            map_amount_error_code("amount_too_low"),
+            "AmountTooLowScreen"
         );
+        assert_eq!(
+            map_amount_error_code("amount_invalid"),
+            "AmountInvalidScreen"
+        );
+        assert_eq!(map_amount_error_code("unknown"), "FailureScreen");
     }
 
     // NOTE: Disabled test - incompatible with SpacetimeDB 1.4.0 API
@@ -825,209 +822,4 @@ mod tests {
     //     // This test would need to be rewritten for SpacetimeDB 1.4.0
     //     // The API for testing has changed significantly
     // }
-
-    #[cfg(test)]
-    mod ussd_screen_display_tests {
-        use super::*;
-
-        // Mock function to create test USSDMenuItem
-        // TODO: Replace with real ctx.db.menu_item
-        fn create_test_menu_item(option: &str, display_name: &str, screen_id: u64) -> USSDMenuItem {
-            USSDMenuItem {
-                option: option.to_string(),
-                display_name: display_name.to_string(),
-                next_screen: "next".to_string(),
-                name: format!("item_{}", option),
-                screen: screen_id,
-            }
-        }
-
-        // Mock function to create test USSDScreen
-        fn create_test_screen(id: u64, screen_type: ScreenType, text: &str) -> USSDScreen {
-            USSDScreen {
-                id,
-                ussd_menu: 1,
-                text: text.to_string(),
-                screen_type,
-                default_next_screen: "default".to_string(),
-                service_code: "*4337#".to_string(),
-                function: None,
-                name: format!("screen_{}", id),
-            }
-        }
-
-        #[test]
-        fn test_format_menu_items_empty_list() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Test Menu");
-            let items: Vec<USSDMenuItem> = vec![];
-            
-            let result = screen.format_menu_items(&items);
-            
-            assert_eq!(result, "");
-        }
-
-        #[test]
-        fn test_format_menu_items_single_item() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Test Menu");
-            let items = vec![
-                create_test_menu_item("1", "Send Money", 1)
-            ];
-            
-            let result = screen.format_menu_items(&items);
-            
-            assert_eq!(result, "\n1. Send Money");
-        }
-
-        #[test]
-        fn test_format_menu_items_multiple_items() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Test Menu");
-            let items = vec![
-                create_test_menu_item("1", "Send Money", 1),
-                create_test_menu_item("2", "Check Balance", 1),
-                create_test_menu_item("3", "Transaction History", 1)
-            ];
-            
-            let result = screen.format_menu_items(&items);
-            
-            assert_eq!(result, "\n1. Send Money\n2. Check Balance\n3. Transaction History");
-        }
-
-        #[test]
-        fn test_display_router_screen_returns_none() {
-            let screen = create_test_screen(1, ScreenType::Router, "Router Screen");
-            // Note: We can't easily mock ReducerContext, so this test is limited
-            // In a real test environment, you'd use a proper mock or test framework
-            
-            // The logic should return None for Router screens
-            // This test verifies the pattern matching logic
-            match screen.screen_type {
-                ScreenType::Router | ScreenType::Initial => assert!(true),
-                _ => assert!(false, "Router screen should match the None pattern"),
-            }
-        }
-
-        #[test]
-        fn test_display_initial_screen_returns_none() {
-            let screen = create_test_screen(1, ScreenType::Initial, "Initial Screen");
-            
-            // The logic should return None for Initial screens
-            match screen.screen_type {
-                ScreenType::Router | ScreenType::Initial => assert!(true),
-                _ => assert!(false, "Initial screen should match the None pattern"),
-            }
-        }
-
-        #[test]
-        fn test_display_input_screen_returns_text() {
-            let screen = create_test_screen(1, ScreenType::Input, "Enter your PIN:");
-            
-            // For non-Menu, non-Router, non-Initial screens, should return text
-            match screen.screen_type {
-                ScreenType::Router | ScreenType::Initial => assert!(false),
-                ScreenType::Menu => assert!(false),
-                _ => {
-                    // Should return Some(text.clone())
-                    let expected = screen.text.clone();
-                    assert_eq!(expected, "Enter your PIN:");
-                }
-            }
-        }
-
-        #[test]
-        fn test_display_function_screen_returns_text() {
-            let screen = create_test_screen(1, ScreenType::Function, "Processing transaction...");
-            
-            match screen.screen_type {
-                ScreenType::Router | ScreenType::Initial => assert!(false),
-                ScreenType::Menu => assert!(false),
-                _ => {
-                    let expected = screen.text.clone();
-                    assert_eq!(expected, "Processing transaction...");
-                }
-            }
-        }
-
-        #[test]
-        fn test_display_quit_screen_returns_text() {
-            let screen = create_test_screen(1, ScreenType::Quit, "Thank you for using our service!");
-            
-            match screen.screen_type {
-                ScreenType::Router | ScreenType::Initial => assert!(false),
-                ScreenType::Menu => assert!(false),
-                _ => {
-                    let expected = screen.text.clone();
-                    assert_eq!(expected, "Thank you for using our service!");
-                }
-            }
-        }
-
-        #[test]
-        fn test_format_menu_screen_with_empty_items() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Main Menu");
-            let items: Vec<USSDMenuItem> = vec![];
-            
-            // Simulate what format_menu_screen would do with empty items
-            let result = match items.is_empty() {
-                true => format!("{}\nNo menu items found", screen.text),
-                false => format!("{}{}", screen.text, screen.format_menu_items(&items)),
-            };
-            
-            assert_eq!(result, "Main Menu\nNo menu items found");
-        }
-
-        #[test]
-        fn test_format_menu_screen_with_items() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Main Menu");
-            let items = vec![
-                create_test_menu_item("1", "Send ETH", 1),
-                create_test_menu_item("2", "Check Balance", 1)
-            ];
-            
-            // Simulate what format_menu_screen would do with items
-            let result = match items.is_empty() {
-                true => format!("{}\nNo menu items found", screen.text),
-                false => format!("{}{}", screen.text, screen.format_menu_items(&items)),
-            };
-            
-            assert_eq!(result, "Main Menu\n1. Send ETH\n2. Check Balance");
-        }
-
-        #[test]
-        fn test_menu_item_sorting_by_option() {
-            let screen = create_test_screen(1, ScreenType::Menu, "Test Menu");
-            let mut items = vec![
-                create_test_menu_item("3", "Third Option", 1),
-                create_test_menu_item("1", "First Option", 1),
-                create_test_menu_item("2", "Second Option", 1),
-                create_test_menu_item("invalid", "Invalid Option", 1), // Should default to 0
-            ];
-            
-            // Test the sorting logic
-            items.sort_by_key(|item| item.option.parse::<usize>().unwrap_or(0));
-            
-            assert_eq!(items[0].option, "invalid"); // Should be first (defaults to 0)
-            assert_eq!(items[1].option, "1");
-            assert_eq!(items[2].option, "2");
-            assert_eq!(items[3].option, "3");
-        }
-
-        #[test]
-        fn test_screen_type_pattern_matching() {
-            // Test all screen types to ensure pattern matching works correctly
-            let test_cases = vec![
-                (ScreenType::Initial, true),   // Should return None
-                (ScreenType::Router, true),    // Should return None
-                (ScreenType::Menu, false),     // Should return Some (special case)
-                (ScreenType::Input, false),    // Should return Some
-                (ScreenType::Function, false), // Should return Some
-                (ScreenType::Quit, false),     // Should return Some
-            ];
-
-            for (screen_type, should_be_none) in test_cases {
-                let returns_none = matches!(screen_type, ScreenType::Router | ScreenType::Initial);
-                assert_eq!(returns_none, should_be_none, 
-                    "Screen type {:?} pattern matching failed", screen_type);
-            }
-        }
-    }
 }

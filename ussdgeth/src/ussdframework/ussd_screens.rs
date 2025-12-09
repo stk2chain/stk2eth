@@ -27,23 +27,6 @@ impl fmt::Display for ScreenType {
     }
 }
 
-impl ScreenType {
-    pub fn from_string(screen_type: &str) -> ScreenType {
-        match screen_type {
-            "Initial" => ScreenType::Initial,
-            "Menu" => ScreenType::Menu,
-            "Input" => ScreenType::Input,
-            "Function" => ScreenType::Function,
-            "Router" => ScreenType::Router,
-            "Quit" => ScreenType::Quit,
-            _ => {
-                log::error!("Invalid screen type");
-                ScreenType::Initial
-            }
-        }
-    }
-}
-
 // Define structure for a screen
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct USSDScreen {
@@ -73,6 +56,7 @@ impl USSDScreen {
     /// - For an input screen, the message comprises the screen text alone.
     /// - For a function screen, the message comprises the screen text alone.
     /// - For a router screen, no message is displayed.
+    #[allow(dead_code)]
     pub fn display(&self) -> Option<String> {
         let mut message = String::new();
 
