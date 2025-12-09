@@ -92,7 +92,7 @@ mod audit_log_tests {
     /// Test phone number format validation
     #[test]
     fn test_phone_number_validation() {
-        let _valid_phones = vec!["+254792281871", "+1234567890", "+44123456789"];
+        let _valid_phones = ["+254792281871", "+1234567890", "+44123456789"];
 
         // Test phone number format validation
         let valid_phones = vec!["+254712345678", "+1234567890", "+44123456789"];

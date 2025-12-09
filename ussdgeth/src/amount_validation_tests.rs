@@ -1,9 +1,8 @@
 #[cfg(test)]
-mod amount_validation_tests {
+mod tests {
     use crate::AmountValidationResult;
     use rust_decimal::prelude::FromStr;
     use rust_decimal::Decimal;
-
     #[test]
     fn test_validate_amount_greater_than_or_equal_to_minimum() {
         let amount = "0.00025";

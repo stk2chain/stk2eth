@@ -1,4 +1,4 @@
-use ethclient::client::EthClient;
+use ethclient::EthClient;
 use ethers::types::U256;
 use spacetimedb::Swaps;
 use ussdgeth::controller::send_eth_reducer;

@@ -4,11 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ussdgeth = { path = "../ussdgeth" }
+ethclient = { path = "../ethclient" }
 dotenv = "0.15"
 axum = "0.8.4"
 reqwest = { version = "0.12.23", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1.0.227", features = ["derive"] }
 serde_json = "1.0.145"
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.47.1", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
 anyhow = "1.0.100"
 hyper = "1.7.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.20"
+serde_urlencoded = "0.7.1"
