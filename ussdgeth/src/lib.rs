@@ -15,15 +15,15 @@ use crate::ussdframework::utils::FUNCTION_MAP;
 
 use ussdframework::{ussd_screens, USSDMenu as FrameworkMenu};
 mod controller;
-mod crypto;
+// mod crypto;
 mod ethclient_wrapper;
 mod reducers;
 mod functions;
 
-pub use reducers::keys::{delete_user_key, fetch_user_key, store_user_key};
+// pub use reducers::keys::{delete_user_key, fetch_user_key, store_user_key};
 pub use reducers::send_eth::send_eth;
-pub use reducers::validate_phone::map_phone_to_wallet;
-pub use reducers::validate_pin::validate_pin;
+// pub use reducers::validate_phone::map_phone_to_wallet;
+// pub use reducers::validate_pin::validate_pin;
 pub use functions::register_functions;
 
 
@@ -32,16 +32,13 @@ pub struct EsimProfile {
     #[primary_key]
     #[unique]
     phone_number: String,
-    #[unique]
+    // #[unique]
     wallet_address: String,
     auth_hash: Option<String>,
     created_at: Timestamp,
     updated_at: Timestamp,
 }
 
-
-//TODO: Make it transient
-#[derive(Clone)]
 
 //if you want to call them via /call/<reducer>.
 
@@ -68,6 +65,10 @@ pub struct UserKey {
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
+
+
+//TODO: Make it transient
+#[derive(Clone)]
 #[table(name = ussd_session)]
 pub struct USSDSession {
     #[primary_key]
@@ -78,6 +79,7 @@ pub struct USSDSession {
     data: String,
 
     current_screen: String,
+    error_text: Option<String>,
     // visited_screens: Vec<String>,
     last_interaction_time: Timestamp,
 
@@ -144,13 +146,12 @@ pub struct USSDService {
 
 impl USSDService {
     
-    fn load_function(&self) -> Box<dyn Fn(&str) -> Result<(), String> + '_> {
+    fn load_function(&self) -> Box<dyn Fn(&ReducerContext, USSDSession) -> Result<USSDSession, String> + '_> {
         // Load the function from the registered functions
-        let func = FUNCTION_MAP
-            .lock()
-            .unwrap()
-            .get(&self.function_name)
-            .cloned();
+        let func = { 
+            let map = FUNCTION_MAP.lock().unwrap();
+            map.get(&self.function_name).cloned()
+        };
 
         match func {
             Some(f) => {
@@ -159,7 +160,7 @@ impl USSDService {
             }
             None => {
                 log::error!("Function not found: {}", self.function_name);
-                Box::new(|_input: &str| {
+                Box::new(|_ctx: &ReducerContext, _session: USSDSession| {
                     Err(format!("Function '{}' not found", self.function_name))
                 })
             }
@@ -253,7 +254,7 @@ impl USSDScreen {
             .join("")
     }
 
-    fn execute(&self, ctx: &ReducerContext, user_input: &str, session: USSDSession) -> USSDSession {
+    fn execute(&self, ctx: &ReducerContext, user_input: &str, mut session: USSDSession) -> USSDSession {
         let input = user_input.trim();
 
         let mut next_screen = session.current_screen.clone();
@@ -266,10 +267,21 @@ impl USSDScreen {
             }
             ScreenType::Function => {
                 if let Some(function_name) = &self.function {
-                    if let Ok(_) = self.execute_function_screen(ctx, input, function_name) {
-                        next_screen = self.default_next_screen.clone();
+                    match self.execute_function_screen(ctx, session.clone(), function_name) {
+                        Ok(updated_session) => {
+                            session = updated_session;
+                            next_screen = self.default_next_screen.clone();
+                            log::info!("Function executed successfully: {}", function_name);
+                            log::info!("Session Data updated: {}", session.data);
+                        }
+                        // NB: Session MUST never be updated by a screenfn on error
+                        Err(err) => {
+                            session.error_text = Some(err.clone());
+                            // ctx.db.ussd_session().session_id().update(session);
+                            log::error!("Function execution failed: {}", err);
+                        }
                     }
-                }
+                }          
             }
             _ => {
                 log::warn!("Screen type {:?} not supported by execute function", self.screen_type);
@@ -300,14 +312,14 @@ impl USSDScreen {
         
     }
 
-    fn execute_function_screen(&self, ctx: &ReducerContext, user_input: &str, function_name: &str) -> Result<(), String> {
+    fn execute_function_screen(&self, ctx: &ReducerContext, session: USSDSession, function_name: &str) -> Result<USSDSession, String> {
         let svc_opt = ctx.db.ussd_service().iter().find(|svc| {
                 svc.name == function_name || svc.data_key == function_name || svc.function_name == function_name
             });
                 
         if let Some(svc) = svc_opt {
             let loaded_function = svc.load_function();
-            loaded_function(user_input)
+            loaded_function(ctx, session)
                     
         } else {
             return Err(format!("Function not found for screen '{}'", self.name))
@@ -582,6 +594,7 @@ fn session_update_or_create(
             client: ctx.sender, //client identity
             // online: true,
             last_interaction_time: ctx.timestamp,
+            error_text: None,
             // end_session: false,
             ..session_retrieved
         })
@@ -595,6 +608,7 @@ fn session_update_or_create(
             current_screen: initial_screen,
             client: ctx.sender, //client identity
             authenticated: false,
+            error_text: None,
             last_interaction_time: ctx.timestamp,
         })
     }
@@ -628,6 +642,7 @@ pub fn get_initial_screen(ctx: &ReducerContext, profile: Option<EsimProfile>) ->
 }
 
 
+//TODO: ONLY the USSD Client should be able to call this function
 #[reducer]
 pub fn process_ussd_step(
     ctx: &ReducerContext,
@@ -637,6 +652,7 @@ pub fn process_ussd_step(
     service_code: String,
     text: String,
 ) {
+    // TODO: Check Client is whitelisted USSD Client
     if let Some(_menu) = ctx.db.ussd_menu().service_code().find(service_code.clone()) {
         //Does phone number EsimProfile exist in DB?
 
@@ -669,7 +685,10 @@ pub fn process_ussd_step(
         // Update USSD Response
         // Get updated current screen after execution
         current_screen = ctx.db.ussd_screen().name().find(current_session.current_screen.clone());
-        let display_text = current_screen.clone().expect("Screen not found ::display").display(&ctx);
+        let mut display_text = current_screen.clone().expect("Screen not found ::display").display(&ctx);
+        if let Some(error_text) = current_session.error_text {
+            display_text = format!("{}\n{}", display_text.unwrap_or_default(), error_text).into();
+        }
         response_update_or_create(ctx, session_id.clone(), display_text.clone().expect("Display text not found"));
 
         
