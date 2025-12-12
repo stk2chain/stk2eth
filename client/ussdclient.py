@@ -12,7 +12,7 @@ import sys
 import logging
 from flask import Flask, request
 from flask_cors import CORS
-from stdb_client_v2 import (
+from stdb_client import (
     FlaskSTDB,
     build_uri,
     parse_query,
