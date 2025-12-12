@@ -32,7 +32,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 
 </br>
 
-## Demo: [Mobile ETH USSD Simulator](https://v0-mobile-eth.vercel.app/ussd/demo) (*Try without setup.*)
+## Demo: <a href="https://v0-mobile-eth.vercel.app/ussd/demo" target="_blank">Mobile ETH USSD Simulator</a> (*Try without setup.*)
 
 </br>
 
@@ -114,7 +114,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    Service Code: *384*6086#	
    Callback URL: https://abc123xyz.ngrok-free.app/ussdeth
    ```
-3. Launch the [Simulator](https://v0-mobile-eth.vercel.app/ussd/demo) and test the flow
+3. Launch the <a href="https://v0-mobile-eth.vercel.app/ussd/demo" target="_blank">Simulator</a> and test the flow
 
 </br>
 
@@ -128,5 +128,4 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 | [**smsclient**](../ussd/README.md) | Sends transaction notifications via SMS | Rust/WASM | 🚧 In Development |
 | [**contracts**](../contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
 | [**eSTK**](../doc/specs/applet.md) | eSIM JavaCard Applet Wallet over USSD | JavaCard | 🚧 In Development |
-
 
