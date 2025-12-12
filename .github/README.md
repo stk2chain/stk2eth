@@ -8,6 +8,11 @@
 [![codecov](https://codecov.io/gh/stk2chain/stk2eth/branch/develop/graph/badge.svg)](https://codecov.io/gh/stk2chain/stk2eth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust Version](https://img.shields.io/badge/rust-1.83%2B-blue.svg)](https://www.rust-lang.org)
+
+<!-- ![USSD CI](https://github.com/stk2chain/stk2eth/actions/workflows/deploy-ussd.yml/badge.svg)
+![ETH CI](https://github.com/stk2chain/stk2eth/actions/workflows/deploy-eth.yml/badge.svg)  
+![SMS CI](https://github.com/stk2chain/stk2eth/actions/workflows/deploy-sms.yml/badge.svg)
+![Full Deploy](https://github.com/stk2chain/stk2eth/actions/workflows/deploy-all.yml/badge.svg) -->
 <!-- markdownlint-disable-next-line MD036 -->
 
 
@@ -27,7 +32,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 
 </br>
 
-## Demo: [Mobile ETH USSD Simulator](./doc/AT.gif) (*Try without setup.*)
+## Demo: [Mobile ETH USSD Simulator](https://v0-mobile-eth.vercel.app/ussd/demo) (*Try without setup.*)
 
 </br>
 
@@ -109,7 +114,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    Service Code: *384*6086#	
    Callback URL: https://abc123xyz.ngrok-free.app/ussdeth
    ```
-3. Launch the [Simulator](https://developers.africastalking.com/simulator) and test the flow
+3. Launch the [Simulator](https://v0-mobile-eth.vercel.app/ussd/demo) and test the flow
 
 </br>
 
@@ -123,4 +128,24 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 | [**smsclient**](../ussd/README.md) | Sends transaction notifications via SMS | Rust/WASM | 🚧 In Development |
 | [**contracts**](../contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
 | [**eSTK**](../doc/specs/applet.md) | eSIM JavaCard Applet Wallet over USSD | JavaCard | 🚧 In Development |
+
+## Supported USSD Providers
+
+- Africa's Talking
+
+## Supported Chains
+- Base
+- Base Goerli
+
+## Supported Countries
+- Kenya
+- Uganda
+- Tanzania
+- Rwanda
+- Burundi
+- Uganda
+- Rwanda
+- Burundi
+- Brazil
+- India
 
