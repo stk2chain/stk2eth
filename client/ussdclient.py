@@ -7,6 +7,7 @@ Usage:
     # With debug logging:
     python app.py --debug
 """
+import os
 import sys
 import logging
 from flask import Flask, request
@@ -28,8 +29,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
+
+stdb_host = os.getenv("SPACETIMEDB_HOST", "0.0.0.0")            
+stdb_dbname = os.getenv("SPACETIMEDB_DBNAME", "gateway2")
+stdb_port = int(os.getenv("SPACETIMEDB_PORT", "3000"))
+
 # Initialize SpacetimeDB client
-uri = build_uri(host="0.0.0.0", port=3000, database="gateway2")
+uri = build_uri(host=stdb_host, port=stdb_port, database=stdb_dbname)
 stdb = FlaskSTDB(uri)
 
 logger.info("="*60)
