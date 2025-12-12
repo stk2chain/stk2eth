@@ -22,7 +22,7 @@ from stdb_client import (
 from dotenv import load_dotenv
 
 # Configure logging based on command line args
-log_level = logging.DEBUG if "--debug" in sys.argv else logging.INFO
+log_level = logging.DEBUG if "--debug" in sys.argv else logging.DEBUG #INFO
 configure_logging(level=log_level)
 
 logger = logging.getLogger(__name__)
