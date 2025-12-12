@@ -129,23 +129,4 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 | [**contracts**](../contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
 | [**eSTK**](../doc/specs/applet.md) | eSIM JavaCard Applet Wallet over USSD | JavaCard | 🚧 In Development |
 
-## Supported USSD Providers
-
-- Africa's Talking
-
-## Supported Chains
-- Base
-- Base Goerli
-
-## Supported Countries
-- Kenya
-- Uganda
-- Tanzania
-- Rwanda
-- Burundi
-- Uganda
-- Rwanda
-- Burundi
-- Brazil
-- India
 
