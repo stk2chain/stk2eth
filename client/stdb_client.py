@@ -649,7 +649,8 @@ def build_uri(host: str = "localhost", port: int = 3000,
               database: str = "gateway2", secure: bool = False) -> str:
     """Build SpacetimeDB WebSocket URI"""
     proto = "wss" if secure else "ws"
-    uri = f"{proto}://{host}:{port}/v1/database/{database}/subscribe"
+    host_with_port = f"{host}:{port}" if not host.endswith("spacetimedb.com") else host
+    uri = f"{proto}://{host_with_port}/v1/database/{database}/subscribe"
     logger.debug(f"Built URI: {uri}")
     return uri
 

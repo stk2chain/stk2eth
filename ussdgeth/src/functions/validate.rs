@@ -1,5 +1,5 @@
 use crate::functions::{hash_pin, parse_input};
-use crate::{esim_profile, EsimProfile, USSDSession};
+use crate::{esim_profile, swap, EsimProfile, USSDSession, Swap, SwapStatus, SwapType};
 use spacetimedb::Table;    
 use spacetimedb::ReducerContext;
 
@@ -79,7 +79,14 @@ pub fn validate_pin(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSe
     if parts.len() != 4 {
         return Err("Invalid input format".to_string());
     }
+
+    let swap_type = match SwapType::from_str(parts[0]) {
+        Some(st) => st,
+        None => return Err("Invalid swap type".to_string()),
+    };
     
+    let phone_number = parts[1];
+    let amount = parts[2];
     let pin = parts[3];
     
     if let Some(eprofile) = ctx.db.esim_profile().phone_number().find(session.phone_number.clone()) {
@@ -87,6 +94,26 @@ pub fn validate_pin(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSe
         let pin_hash = hash_pin(pin, &session.phone_number, &eprofile.created_at.to_string());
         if let Some(auth_hash) = eprofile.auth_hash {
             if pin_hash == auth_hash {
+
+                ctx.db.swap().insert(Swap {
+                    id: 0, // This is ignored and auto-incremented
+                    session_id: session.session_id.clone(),
+                    from_address: eprofile.wallet_address.clone(),
+                    to_address: phone_number.to_string(),
+                    amount: amount.to_string(),
+                    token_in: "ETH".to_string(),
+                    token_out: "ETH".to_string(),
+                    status: SwapStatus::Pending,
+                    tx_hash: None,
+                    gas_price: None,
+                    gas_limit: Some("21000".to_string()),
+                    nonce: None,
+                    created_at: ctx.timestamp,
+                    updated_at: ctx.timestamp,
+                    error_message: None,
+                    swap_type: swap_type,
+                });
+
                 return Ok(session);
             } else {
                 return Err("Invalid pin".to_string());
