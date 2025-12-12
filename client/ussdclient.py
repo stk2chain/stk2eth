@@ -35,7 +35,7 @@ stdb_dbname = os.getenv("SPACETIMEDB_DBNAME", "gateway2")
 stdb_port = int(os.getenv("SPACETIMEDB_PORT", "3000"))
 
 # Initialize SpacetimeDB client
-uri = build_uri(host=stdb_host, port=stdb_port, database=stdb_dbname)
+uri = build_uri(host=stdb_host, port=stdb_port, database=stdb_dbname, secure=True)
 stdb = FlaskSTDB(uri)
 
 logger.info("="*60)
