@@ -38,11 +38,21 @@ async def connect(uri: str, handlers: Dict[str, Callable] = None) -> tuple:
         ws = await websockets.connect(
             uri,
             subprotocols=["v1.json.spacetimedb"],
-            max_size=10 * 1024 * 1024
+            max_size=10 * 1024 * 1024,
+            ping_interval=None,
+            ping_timeout=None,
+            close_timeout=10,
+            open_timeout=15
         )
         logger.info(f"✓ WebSocket connected successfully (subprotocol: {ws.subprotocol})")
+    except asyncio.TimeoutError:
+        logger.error(f"✗ Connection timeout after 15s - check if host is reachable")
+        raise
+    except ConnectionRefusedError:
+        logger.error(f"✗ Connection refused - server may be down or host/port incorrect")
+        raise
     except Exception as e:
-        logger.error(f"✗ WebSocket connection failed: {e}")
+        logger.error(f"✗ WebSocket connection failed: {type(e).__name__}: {e}")
         raise
 
     pending = {}
@@ -136,6 +146,8 @@ def _resolve_pending(data: dict, pending: dict) -> Optional[str]:
         req_id = tx.get('request_id')
         status = tx.get('status', {})
 
+        logger.debug(f"  TransactionUpdate: request_id={req_id}, status={list(status.keys())}")
+
         # If request_id is present and in pending
         if req_id is not None and req_id in pending:
             if 'Committed' in status:
@@ -150,18 +162,22 @@ def _resolve_pending(data: dict, pending: dict) -> Optional[str]:
 
         # If no request_id or not in pending, resolve the oldest pending request
         # This handles cases where SpacetimeDB doesn't return request_id
-        elif pending:
+        elif pending and ('Committed' in status or 'Failed' in status):
             # Get the oldest (lowest) request_id
-            oldest_id = min(k for k in pending.keys() if isinstance(k, int))
-            if 'Committed' in status:
-                logger.debug(f"  Transaction committed (no request_id), resolving oldest: {oldest_id}")
-                pending[oldest_id].set_result(data)
-                return f"oldest_request={oldest_id}"
-            elif 'Failed' in status:
-                error = status['Failed']
-                logger.warning(f"  Transaction failed (no request_id), resolving oldest: {oldest_id}, error={error}")
-                pending[oldest_id].set_exception(Exception(error))
-                return f"oldest_request={oldest_id}"
+            int_keys = [k for k in pending.keys() if isinstance(k, int)]
+            if int_keys:
+                oldest_id = min(int_keys)
+                if 'Committed' in status:
+                    logger.debug(f"  Transaction committed (no request_id in response), resolving oldest: {oldest_id}")
+                    pending[oldest_id].set_result(data)
+                    return f"oldest_request={oldest_id}"
+                elif 'Failed' in status:
+                    error = status['Failed']
+                    logger.warning(f"  Transaction failed (no request_id in response), resolving oldest: {oldest_id}, error={error}")
+                    pending[oldest_id].set_exception(Exception(error))
+                    return f"oldest_request={oldest_id}"
+            else:
+                logger.warning(f"  No integer request IDs in pending: {list(pending.keys())}")
 
     # OneOffQueryResponse with message_id
     elif 'OneOffQueryResponse' in data:
@@ -215,7 +231,7 @@ _request_counter = 0
 
 async def call_reducer(ws, name: str, *args, timeout: float = 10) -> dict:
     """
-    Call a SpacetimeDB reducer
+    Call a SpacetimeDB reducer via websocket
 
     Args:
         ws: WebSocket connection
@@ -232,8 +248,8 @@ async def call_reducer(ws, name: str, *args, timeout: float = 10) -> dict:
 
     logger.info(f"→ Calling reducer: {name}")
     logger.debug(f"  request_id: {req_id}")
-    logger.debug(f"  args: {args}")
     logger.debug(f"  timeout: {timeout}s")
+    logger.debug(f"  pending_requests: {len(ws._pending)}")
 
     future = asyncio.get_event_loop().create_future()
     ws._pending[req_id] = future
@@ -249,7 +265,7 @@ async def call_reducer(ws, name: str, *args, timeout: float = 10) -> dict:
 
     try:
         await ws.send(json.dumps(msg))
-        logger.debug(f"  ✓ Request sent")
+        logger.debug(f"  ✓ Request sent, waiting for response...")
 
         result = await asyncio.wait_for(future, timeout)
         logger.info(f"← Reducer response received: {name}")
@@ -257,6 +273,8 @@ async def call_reducer(ws, name: str, *args, timeout: float = 10) -> dict:
 
     except asyncio.TimeoutError:
         logger.error(f"✗ Reducer timeout: {name} (after {timeout}s)")
+        logger.error(f"  Request ID {req_id} was never resolved")
+        logger.error(f"  Pending requests: {list(ws._pending.keys())}")
         raise
     except Exception as e:
         logger.error(f"✗ Reducer error: {name} - {e}")
@@ -286,7 +304,6 @@ async def query(ws, sql: str, timeout: float = 10) -> dict:
 
     logger.info(f"→ Executing query")
     logger.debug(f"  message_id: {msg_id}")
-    logger.debug(f"  sql: {sql[:100]}{'...' if len(sql) > 100 else ''}")
     logger.debug(f"  timeout: {timeout}s")
 
     future = asyncio.get_event_loop().create_future()
@@ -316,6 +333,46 @@ async def query(ws, sql: str, timeout: float = 10) -> dict:
     finally:
         ws._pending.pop(msg_id, None)
         logger.debug(f"  Cleaned up message_id: {msg_id}")
+
+
+# ============================================================================
+# SUBSCRIPTIONS
+# ============================================================================
+async def send_subscription(ws, table_name: str, timeout: float = 10):
+    """Send SubscribeSingle message to subscribe to Swap table"""
+    global _request_counter
+    _request_counter += 1
+    req_id = _request_counter
+
+    logger.info(f"→ Subscription to table: {table_name}")
+    logger.debug(f"  request_id: {req_id}")
+    logger.debug(f"  timeout: {timeout}s")
+
+    try:
+        # Generate unique IDs
+        query_id = int(uuid.uuid4().int & 0xFFFFFFFF)
+
+        # Construct SubscribeSingle message
+        msg = {
+            "SubscribeSingle": {
+                "query": f"SELECT * FROM {table_name}",
+                "request_id": req_id,
+                "query_id": {"id": query_id}
+            }
+        }
+
+        json_message = json.dumps(msg)
+
+        logger.info(f"→ Sending subscription request")
+        logger.info(f"  Query: SELECT * FROM {table_name}")
+        logger.info(f"  Request ID: {req_id}")
+        logger.info(f"  Query ID: {query_id}")
+
+        await ws.send(json_message)
+        logger.info(f"✓ Subscription request sent\n")
+
+    except Exception as e:
+        logger.error(f"✗ Failed to send subscription: {e}", exc_info=True)
 
 
 # ============================================================================
@@ -414,12 +471,14 @@ class FlaskSTDB:
         self.tasks = []
         self.loop = None
         self.ready = asyncio.Event()
+        self._connection_error = None
 
         logger.info(f"FlaskSTDB initialized: {uri}")
 
     def start(self):
         """Start background client"""
         import threading
+        import time
 
         logger.info("Starting background SpacetimeDB client thread")
 
@@ -429,12 +488,20 @@ class FlaskSTDB:
                 asyncio.set_event_loop(self.loop)
                 logger.debug("Event loop created in background thread")
 
-                self.loop.run_until_complete(self._connect())
+                # Run the connection coroutine as a task, not blocking
+                connect_task = self.loop.create_task(self._connect())
+
+                # Run the event loop forever (allows run_coroutine_threadsafe to work)
+                logger.debug("Starting event loop (run_forever mode)...")
+                self.loop.run_forever()
+
+                logger.debug("Event loop stopped")
 
             except KeyboardInterrupt:
                 logger.info("Background thread interrupted")
             except Exception as e:
-                logger.error(f"Background thread error: {e}", exc_info=True)
+                logger.error(f"Background thread fatal error: {e}", exc_info=True)
+                self._connection_error = e
             finally:
                 # Cleanup
                 if self.loop and not self.loop.is_closed():
@@ -449,17 +516,26 @@ class FlaskSTDB:
         thread.start()
         logger.debug(f"Background thread started: {thread.name}")
 
-        # Wait briefly for connection to establish
-        import time
-        timeout = 10
+        # Wait for client to be ready
+        timeout = 20
         start_time = time.time()
+        logger.info(f"Waiting for client to be ready (timeout: {timeout}s)...")
+
         while not self.ready.is_set() and (time.time() - start_time) < timeout:
-            time.sleep(0.1)
+            # Check if connection failed
+            if self._connection_error:
+                logger.error(f"✗ Connection failed: {self._connection_error}")
+                raise self._connection_error
+            time.sleep(0.2)
 
         if self.ready.is_set():
             logger.info("✓ Client ready for requests")
         else:
-            logger.warning(f"Client not ready after {timeout}s - may still be connecting")
+            error_msg = f"Client not ready after {timeout}s"
+            if self._connection_error:
+                error_msg += f": {self._connection_error}"
+            logger.error(f"✗ {error_msg}")
+            raise TimeoutError(error_msg)
 
     async def _connect(self):
         """Connect and maintain"""
@@ -469,55 +545,83 @@ class FlaskSTDB:
             self.ws, self.tasks = await connect(self.uri, self.handlers)
             logger.info("✓ Connection established")
 
-            # Set ready immediately after connection
+            # Set ready immediately after successful connection
             self.ready.set()
-            logger.info("✓ Background client marked as ready")
+            logger.info("✓ Background client marked as READY")
 
-            # Keep running - wait for any task to fail
-            done, pending = await asyncio.wait(
-                self.tasks,
-                return_when=asyncio.FIRST_COMPLETED
-            )
+            # Log event loop state
+            loop = asyncio.get_event_loop()
+            logger.debug(f"Event loop state: running={loop.is_running()}, closed={loop.is_closed()}")
+            logger.debug("Event loop will now process all tasks indefinitely...")
 
-            logger.warning("Background client task completed unexpectedly")
+            # Simply gather all tasks - this keeps event loop processing everything
+            # Including new tasks scheduled via run_coroutine_threadsafe
+            await asyncio.gather(*self.tasks, return_exceptions=True)
 
-            # Cancel remaining tasks
-            for task in pending:
-                task.cancel()
-
-        except Exception as e:
-            logger.error(f"Background client error: {e}", exc_info=True)
+            # If we get here, a task completed (connection lost)
+            logger.warning("⚠ Background client task completed unexpectedly")
             self.ready.clear()
+            logger.warning("✗ Background client no longer ready")
+
+        except asyncio.TimeoutError as e:
+            logger.error(f"✗ Connection timeout: {e}")
+            self._connection_error = e
+            self.ready.clear()
+            raise
+        except ConnectionRefusedError as e:
+            logger.error(f"✗ Connection refused: {e}")
+            self._connection_error = e
+            self.ready.clear()
+            raise
+        except Exception as e:
+            logger.error(f"✗ Background client error: {e}", exc_info=True)
+            self._connection_error = e
+            self.ready.clear()
+            raise
 
     def call_reducer(self, name: str, *args, timeout: float = 10) -> dict:
         """Call reducer (blocking)"""
         logger.debug(f"FlaskSTDB.call_reducer: {name} (blocking call from Flask)")
 
         if not self.ready.is_set():
-            logger.error(f"✗ Client not ready (ready={self.ready.is_set()}, ws={self.ws is not None}, loop={self.loop is not None})")
+            logger.error(f"✗ Client not ready - ready={self.ready.is_set()}, ws={self.ws is not None}, loop={self.loop is not None}")
             raise ConnectionError("SpacetimeDB client not ready")
 
         if not self.ws:
-            logger.error("✗ WebSocket is None")
+            logger.error("✗ WebSocket connection is None")
             raise ConnectionError("WebSocket connection is None")
 
-        if not self.loop:
-            logger.error("✗ Event loop is None")
-            raise ConnectionError("Event loop is None")
+        if not self.loop or self.loop.is_closed():
+            logger.error("✗ Event loop is None or closed")
+            raise ConnectionError("Event loop is not available")
 
         logger.debug(f"Client state: ready={self.ready.is_set()}, ws={self.ws}, loop={self.loop}")
+        logger.debug(f"Event loop running: {self.loop.is_running()}, closed: {self.loop.is_closed()}")
 
-        future = asyncio.run_coroutine_threadsafe(
-            call_reducer(self.ws, name, *args, timeout=timeout),
-            self.loop
-        )
+        # Add extra time for the blocking wait (timeout + 5s buffer)
+        blocking_timeout = timeout + 5
 
         try:
-            result = future.result(timeout)
+            logger.debug(f"Scheduling coroutine in background thread...")
+            future = asyncio.run_coroutine_threadsafe(
+                call_reducer(self.ws, name, *args, timeout=timeout),
+                self.loop
+            )
+            logger.debug(f"Coroutine scheduled, waiting for result (timeout={blocking_timeout}s)...")
+
+            result = future.result(blocking_timeout)
             logger.debug(f"✓ Blocking call completed: {name}")
             return result
+
+        except TimeoutError as e:
+            logger.error(f"✗ Blocking call timeout: {name} (waited {blocking_timeout}s)")
+            logger.error(f"  Future state: done={future.done()}, cancelled={future.cancelled()}")
+            if not future.done():
+                logger.error(f"  Coroutine never completed - event loop may be blocked")
+            raise
         except Exception as e:
-            logger.error(f"✗ Blocking call failed: {name} - {e}")
+            logger.error(f"✗ Blocking call failed: {name} - {type(e).__name__}: {e}")
+            logger.error(f"  Future state: done={future.done() if 'future' in locals() else 'N/A'}")
             raise
 
     def query(self, sql: str, timeout: float = 10) -> dict:
@@ -536,234 +640,59 @@ class FlaskSTDB:
             logger.error("✗ Event loop is None or closed")
             raise ConnectionError("Event loop is not available")
 
+        # Add extra time for the blocking wait (timeout + 5s buffer)
+        blocking_timeout = timeout + 5
+
         future = asyncio.run_coroutine_threadsafe(
             query(self.ws, sql, timeout=timeout),
             self.loop
         )
 
         try:
-            result = future.result(timeout)
+            result = future.result(blocking_timeout)
             logger.debug(f"✓ Blocking query completed")
             return result
+        except TimeoutError:
+            logger.error(f"✗ Blocking query timeout (waited {blocking_timeout}s)")
+            raise
         except Exception as e:
             logger.error(f"✗ Blocking query failed: {e}")
             raise
 
+    def send_subscription(self, name: str, timeout: float = 10):
+        """Send subscription (blocking)"""
+        logger.debug(f"FlaskSTDB.send_subscription: {name} (blocking call from Flask)")
 
-# ============================================================================
-# SWAP TABLE SUBSCRIPTION HANDLER
-# ============================================================================
+        if not self.ready.is_set():
+            logger.error(f"✗ Client not ready - ready={self.ready.is_set()}, ws={self.ws is not None}, loop={self.loop is not None}")
+            raise ConnectionError("SpacetimeDB client not ready")
 
-def parse_swap_insert(tx_data: dict) -> Optional[dict]:
-    """
-    Parse swap table insert from TransactionUpdate
+        if not self.ws:
+            logger.error("✗ WebSocket connection is None")
+            raise ConnectionError("WebSocket connection is None")
 
-    Args:
-        tx_data: TransactionUpdate data
+        if not self.loop or self.loop.is_closed():
+            logger.error("✗ Event loop is None or closed")
+            raise ConnectionError("Event loop is not available")
 
-    Returns:
-        Parsed swap data or None if no swap insert found
-    """
-    try:
-        tx = tx_data.get('TransactionUpdate', {})
-        status = tx.get('status', {})
+        # Add extra time for the blocking wait (timeout + 5s buffer)
+        blocking_timeout = timeout + 5
 
-        if 'Committed' not in status:
-            return None
+        future = asyncio.run_coroutine_threadsafe(
+            send_subscription(self.ws, name, timeout=timeout),
+            self.loop
+        )
 
-        tables = status['Committed'].get('tables', [])
-
-        # Find swap table
-        for table in tables:
-            if table.get('table_name') == 'swap':
-                updates = table.get('updates', [])
-
-                for update in updates:
-                    inserts = update.get('inserts', [])
-
-                    if inserts:
-                        # Parse first insert (JSON array string)
-                        insert_str = inserts[0]
-                        insert_data = json.loads(insert_str)
-
-                        logger.debug(f"Parsed swap insert: {len(insert_data)} fields")
-
-                        # Map to swap structure (adjust indices based on your schema)
-                        swap = {
-                            'id': insert_data[0],
-                            'session_id': insert_data[1],
-                            'from_address': insert_data[2],
-                            'to_address': insert_data[3],
-                            'amount': insert_data[4],
-                            'from_token': insert_data[5],
-                            'to_token': insert_data[6],
-                            # Optional fields with tuple unpacking
-                            'gas_price': insert_data[10][1] if len(insert_data[10]) > 1 else None,
-                            'created_at': insert_data[12][0] if len(insert_data) > 12 else None,
-                            'updated_at': insert_data[13][0] if len(insert_data) > 13 else None,
-                        }
-
-                        logger.info(f"✓ Swap insert detected: session={swap['session_id']}, amount={swap['amount']}")
-                        return swap
-
-        return None
-
-    except Exception as e:
-        logger.error(f"Error parsing swap insert: {e}", exc_info=True)
-        return None
-
-
-async def handle_swap_transaction(data: dict, callback: Optional[Callable] = None):
-    """
-    Handle swap table transaction updates
-
-    Args:
-        data: Transaction update data
-        callback: Optional callback function(swap_data)
-    """
-    logger.debug("Checking for swap table inserts")
-
-    swap_data = parse_swap_insert(data)
-
-    if swap_data:
-        logger.info(f"Swap transaction: {swap_data['session_id']} - {swap_data['amount']} {swap_data['from_token']}")
-
-        if callback:
-            try:
-                if asyncio.iscoroutinefunction(callback):
-                    await callback(swap_data)
-                else:
-                    callback(swap_data)
-            except Exception as e:
-                logger.error(f"Swap callback error: {e}", exc_info=True)
-
-
-# ============================================================================
-# EXAMPLE USAGE
-# ============================================================================
-
-async def example_standalone():
-    """Example: Standalone async usage with swap table subscription"""
-    uri = "ws://localhost:3000/v1/database/mydb/subscribe"
-
-    # Define swap handler
-    async def on_swap(swap_data):
-        print(f"New swap detected!")
-        print(f"  Session: {swap_data['session_id']}")
-        print(f"  From: {swap_data['from_address']}")
-        print(f"  To: {swap_data['to_address']}")
-        print(f"  Amount: {swap_data['amount']} {swap_data['from_token']}")
-
-    # Define transaction handler that checks for swaps
-    async def on_transaction(data):
-        await handle_swap_transaction(data, on_swap)
-
-    handlers = {"TransactionUpdate": on_transaction}
-
-    # Connect
-    ws, tasks = await connect(uri, handlers)
-
-    try:
-        # Call reducer
-        result = await call_reducer(ws, "process_data", "arg1", "arg2")
-        success, data = parse_reducer(result)
-        logger.info(f"Reducer result: success={success}")
-
-        # Execute query
-        result = await query(ws, "SELECT * FROM users")
-        success, rows = parse_query(result)
-        if success:
-            logger.info(f"Query returned {len(rows)} rows")
-
-            # Filter results
-            active = filter_rows(rows, status="active")
-            logger.info(f"Active users: {len(active)}")
-
-            # Find specific row
-            user = find_one(rows, name="Alice")
-            logger.info(f"Found user: {user}")
-
-        # Keep running to receive swap updates
-        await asyncio.sleep(60)
-
-    finally:
-        await disconnect(ws, tasks)
-
-
-def example_flask():
-    """Example: Flask integration with swap table subscription"""
-    from flask import Flask, request, jsonify
-
-    app = Flask(__name__)
-
-    # Store recent swaps in memory
-    recent_swaps = []
-
-    # Define swap handler
-    async def on_swap(swap_data):
-        logger.info(f"New swap: {swap_data['session_id']} - {swap_data['amount']}")
-        recent_swaps.append(swap_data)
-        # Keep only last 100
-        if len(recent_swaps) > 100:
-            recent_swaps.pop(0)
-
-    # Define transaction handler
-    async def on_transaction(data):
-        await handle_swap_transaction(data, on_swap)
-
-    # Initialize client with swap handler
-    uri = "ws://localhost:3000/v1/database/gateway2/subscribe"
-    handlers = {"TransactionUpdate": on_transaction}
-    stdb = FlaskSTDB(uri, handlers)
-    stdb.start()
-
-    @app.route("/ussd", methods=['POST'])
-    def ussd():
-        session_id = request.values.get("sessionId")
-        phone = request.values.get("phoneNumber")
-        text = request.values.get("text", "")
-
-        logger.info(f"USSD request: session={session_id}, phone={phone}")
-
-        # Call reducer
-        stdb.call_reducer("process_ussd_step", session_id, phone, text)
-
-        # Query response
-        sql = f"SELECT * FROM ussd_response WHERE session_id = '{session_id}'"
-        result = stdb.query(sql)
-        success, rows = parse_query(result)
-
-        if success and rows:
-            response = rows[-1].get("response_text", "END Error")
-            logger.info(f"USSD response: {response}")
-            return response
-
-        logger.warning("No USSD response found")
-        return "END No response"
-
-    @app.route("/health")
-    def health():
-        is_ready = stdb.ready.is_set()
-        logger.debug(f"Health check: ready={is_ready}")
-        return {"status": "ok", "connected": is_ready}
-
-    @app.route("/swaps")
-    def get_swaps():
-        """Get recent swap transactions"""
-        return jsonify({
-            "total": len(recent_swaps),
-            "swaps": recent_swaps[-10:]  # Last 10 swaps
-        })
-
-    @app.route("/swap/<session_id>")
-    def get_swap(session_id):
-        """Get swap by session_id"""
-        swap = next((s for s in recent_swaps if s['session_id'] == session_id), None)
-        if swap:
-            return jsonify(swap)
-        return jsonify({"error": "Swap not found"}), 404
-
-    return app
+        try:
+            result = future.result(blocking_timeout)
+            logger.debug(f"✓ Blocking subscription sent: {name}")
+            return result
+        except TimeoutError:
+            logger.error(f"✗ Blocking subscription timeout (waited {blocking_timeout}s)")
+            raise
+        except Exception as e:
+            logger.error(f"✗ Blocking subscription failed: {name} - {e}")
+            raise
 
 
 # ============================================================================
@@ -812,4 +741,4 @@ if __name__ == "__main__":
     configure_logging(level=logging.DEBUG)
 
     # Run standalone example
-    asyncio.run(example_standalone())
+    print("This is a library module. Import it in your application.")
