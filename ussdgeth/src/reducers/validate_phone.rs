@@ -1,5 +1,5 @@
 // ussdgeth/src/reducers/validate_phone.rs
-use crate::{phone_wallet, PhoneWallet};
+use crate::{esim_profile, EsimProfile};
 use spacetimedb::{reducer, ReducerContext, Table};
 use std::str;
 
@@ -58,7 +58,7 @@ fn is_valid_eth_address(addr: &str) -> bool {
 }
 
 /// Reducer: map phone -> wallet (upsert)
-/// It validates phone (E.164) and wallet (ETH) and then upserts PhoneWallet table.
+/// It validates phone (E.164) and wallet (ETH) and then upserts EsimProfile table.
 #[reducer]
 pub fn map_phone_to_wallet(ctx: &ReducerContext, phone_number: String, wallet_address: String) {
     // Validate phone
@@ -79,38 +79,43 @@ pub fn map_phone_to_wallet(ctx: &ReducerContext, phone_number: String, wallet_ad
         return;
     }
 
-    // Upsert into phone_wallet table
+    // Upsert into esim_profile table
     if let Some(existing) = ctx
         .db
-        .phone_wallet()
+        .esim_profile()
         .phone_number()
         .find(phone_number.clone())
     {
         // update wallet_address + updated_at
-        let updated = PhoneWallet {
+        let updated = EsimProfile {
             wallet_address: wallet_address.clone(),
             updated_at: ctx.timestamp,
             ..existing
         };
-        ctx.db.phone_wallet().phone_number().update(updated);
+        ctx.db.esim_profile().phone_number().update(updated);
         log::info!(
             "map_phone_to_wallet: updated mapping {} -> {}",
             phone_number,
             wallet_address
         );
     } else {
-        // insert new mapping
-        ctx.db.phone_wallet().insert(PhoneWallet {
-            phone_number: phone_number.clone(),
-            wallet_address: wallet_address.clone(),
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-        });
-        log::info!(
-            "map_phone_to_wallet: inserted mapping {} -> {}",
-            phone_number,
-            wallet_address
+        log::warn!(
+            "map_phone_to_wallet: phone {} doesnt exist",
+            phone_number
         );
+        return;
+        // insert new mapping
+        // ctx.db.esim_profile().insert(EsimProfile {
+        //     phone_number: phone_number.clone(),
+        //     wallet_address: wallet_address.clone(),
+        //     created_at: ctx.timestamp,
+        //     updated_at: ctx.timestamp,
+        // });
+        // log::info!(
+        //     "map_phone_to_wallet: inserted mapping {} -> {}",
+        //     phone_number,
+        //     wallet_address
+        // );
     }
 }
 

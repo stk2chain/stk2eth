@@ -1,5 +1,5 @@
 use crate::functions::{validate_pin_format, hash_pin, parse_input};
-use crate::{esim_profile, EsimProfile, USSDSession};
+use crate::{esim_profile, user_pin, EsimProfile, UserPIN, USSDSession};
 use spacetimedb::Table;    
 use spacetimedb::ReducerContext;
 
@@ -57,9 +57,21 @@ pub fn confirm_register_pin(ctx: &ReducerContext, mut session: USSDSession) -> R
     ctx.db.esim_profile().insert(EsimProfile {
         phone_number: session.phone_number.clone(),
         wallet_address: "".to_string(),
-        auth_hash: Some(pin_hash),
-        created_at: tmstmp,
-        updated_at: tmstmp,
+        // auth_hash: Some(pin_hash),
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+    });
+
+    ctx.db.user_pin().insert(UserPIN {
+        phone_number: session.phone_number.clone(),
+        pin_hash: pin_hash,
+        salt: tmstmp.to_string(),
+        attempts: 0,
+        locked: false,
+        last_attempt_time: None,
+        lockout_until: None,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
     });
     
     //Clear Session user_input for Main Screen

@@ -1,5 +1,5 @@
 use crate::functions::{hash_pin, parse_input};
-use crate::{esim_profile, swap, EsimProfile, USSDSession, Swap, SwapStatus, SwapType};
+use crate::{user_pin, swap, UserPIN, USSDSession, Swap, SwapStatus, SwapType};
 use spacetimedb::Table;    
 use spacetimedb::ReducerContext;
 
@@ -89,16 +89,14 @@ pub fn validate_pin(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSe
     let amount = parts[2];
     let pin = parts[3];
     
-    if let Some(eprofile) = ctx.db.esim_profile().phone_number().find(session.phone_number.clone()) {
+    if let Some(user_pin) = ctx.db.user_pin().phone_number().find(session.phone_number.clone()) {
         //NB: PIN & PHONE_NUMBER MUST ONLY BE derived from the Current Session
-        let pin_hash = hash_pin(pin, &session.phone_number, &eprofile.created_at.to_string());
-        if let Some(auth_hash) = eprofile.auth_hash {
-            if pin_hash == auth_hash {
-
-                ctx.db.swap().insert(Swap {
+        let pin_hash = hash_pin(pin, &session.phone_number, &user_pin.salt);
+        if user_pin.pin_hash == pin_hash {
+            ctx.db.swap().insert(Swap {
                     id: 0, // This is ignored and auto-incremented
                     session_id: session.session_id.clone(),
-                    from_address: eprofile.wallet_address.clone(),
+                    from_address: user_pin.phone_number.clone(),
                     to_address: phone_number.to_string(),
                     amount: amount.to_string(),
                     token_in: "ETH".to_string(),
@@ -118,9 +116,6 @@ pub fn validate_pin(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSe
             } else {
                 return Err("Invalid pin".to_string());
             }
-        } else {
-            return Err("PIN not set for user".to_string());
-        }
     }
     //Should never be reached
     return Err("User Not registered".to_string());

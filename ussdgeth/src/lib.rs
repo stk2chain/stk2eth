@@ -27,36 +27,32 @@ pub use reducers::send_eth::send_eth;
 pub use functions::register_functions;
 
 
-#[table(name = esim_profile)]
+#[table(name = esim_profile, public)]
 pub struct EsimProfile {
     #[primary_key]
     #[unique]
     phone_number: String,
     // #[unique]
     wallet_address: String,
-    auth_hash: Option<String>,
+    // auth_hash: Option<String>,
     created_at: Timestamp,
     updated_at: Timestamp,
 }
 
 
-//if you want to call them via /call/<reducer>.
+
 
 #[table(name = phone_wallet)]
 pub struct PhoneWallet {
-    /// E.164 phone number (primary key)
     #[primary_key]
-    pub phone_number: String,
-
-    /// Ethereum wallet address (0x...)
-    pub wallet_address: String,
-
-    /// Creation time
-    pub created_at: Timestamp,
-
-    /// Last update time
-    pub updated_at: Timestamp,
+    #[unique]
+    phone_number: String, //E.164
+    wallet_address: String,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
+
+
 #[table(name = user_key)]
 pub struct UserKey {
     #[primary_key]
@@ -147,9 +143,13 @@ pub struct USSDService {
 impl USSDService {
     
     fn load_function(&self) -> Box<dyn Fn(&ReducerContext, USSDSession) -> Result<USSDSession, String> + '_> {
+        //Ensure functions are registered
+        register_functions();
+        
         // Load the function from the registered functions
         let func = { 
             let map = FUNCTION_MAP.lock().unwrap();
+            log::info!("Function map: {:?}", map);
             map.get(&self.function_name).cloned()
         };
 
@@ -357,6 +357,17 @@ pub enum SwapType {
     CashOut,
 }
 
+impl SwapType {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "1" => Some(Self::SendEth),
+            "2" => Some(Self::TokenSwap),
+            "3" => Some(Self::CashOut),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[table(name = swap, public)]
 pub struct Swap {
@@ -544,7 +555,7 @@ pub fn init(ctx: &ReducerContext) {
     }
     
     //Register all functions
-    register_functions();
+    // register_functions();
     
     log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
 }
