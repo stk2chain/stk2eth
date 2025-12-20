@@ -1,239 +1,166 @@
-# ETH Client - Ethereum Blockchain Interface
+# EthClient
 
-## Overview
+A modern Python Ethereum client with WebSocket support, designed for high-performance interaction with Ethereum networks. Built with a focus on security, efficiency, and developer experience.
 
-The `ethclient` is a Rust library that provides a clean interface for interacting with the Ethereum blockchain. It handles wallet operations, transaction signing, and smart contract interactions for the STK2ETH project's account abstraction functionality.
 
+## Run Client
+```bash
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
+source .env
+
+python ethclient_v2.py
+```
 ## Architecture
+### 0.0 Handlers
+Functions subscribed to `Database Tables` via Websocket triggered on Table row `insert`/`update`/`delete` events.
 
-This is a **Rust library crate** that provides:
-- Ethereum JSON-RPC client functionality
-- Wallet and key management
-- Transaction building and signing
-- Smart contract interaction utilities
+| Handler | Subscription | Table | Description |
+|-----------|---------|------------|--------|                                       
+| **handle_esim** | `on_insert` | **`esim_profile`** | Burner-Wallet Creation |
+| **handle_tx** | `on_insert`,`status=Pending` | **`eth_tx`** | Sign and Broadcast Transaction |
 
-## Key Features
+### 0.1 Burner-Wallet Creation
 
-### Blockchain Interaction
-- **JSON-RPC Client** - Connects to Ethereum nodes (Geth, Infura, etc.)
-- **Transaction Management** - Build, sign, and broadcast transactions
-- **Block Monitoring** - Listen for new blocks and transaction confirmations
-- **Gas Estimation** - Dynamic gas price calculation and optimization
-
-### Wallet Operations
-- **Key Management** - Generate and manage Ethereum private keys
-- **Account Abstraction** - Support for smart contract wallets
-- **Multi-signature** - Coordinate multi-sig wallet operations
-- **Hardware Wallet** - Integration with hardware security modules
-
-### Smart Contract Integration
-- **Contract Deployment** - Deploy new smart contracts
-- **Contract Calls** - Interact with existing contracts
-- **Event Monitoring** - Listen for smart contract events
-- **ABI Encoding/Decoding** - Handle contract interface encoding
-
-## Development Status
-
-⚠️ **Note**: This module is currently a **placeholder/stub** implementation. The core functionality needs to be implemented based on project requirements.
-
-### Planned Features
-- [ ] Ethereum node connection management
-- [ ] Transaction pool monitoring
-- [ ] Account abstraction wallet support
-- [ ] ERC-20 token operations
-- [ ] Smart contract deployment utilities
-- [ ] Gas optimization strategies
-- [ ] Multi-network support (mainnet, testnets)
-
-## Development
-
-### Prerequisites
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://rustup.rs | sh
-
-# For development against local node
-# Install and run Ganache CLI or similar
-npm install -g ganache-cli
-ganache-cli --port 8545
+```python
+def handle_esim(insert, stdb):
+    data = parse_insert(insert)
+    phone_number, wallet_address = data[0], data[1]
+    
+    if wallet_address == "":
+        wallet, signed_auth, phone_salt = create_phone_burner_wallet(phone_number, 0)     
+        try:
+            stdb.call_reducer("map_phone_to_wallet", phone_number, wallet)
+            ...
 ```
+* Triggered **ONLY** on **NEW `esim_profile` row insert** *(User Registration)*.
+* **`Burner-Wallet`**: [Nick's Method+Phone](https://medium.com/patronum-labs/nicks-method-ethereum-keyless-execution-168a6659479c) derived *(Keyless)*, [EIP-7702 SignedAuthorization](https://eips.ethereum.org/EIPS/eip-7702) delegation to a [Permit2WithOperatorOnlyERC1271](contracts/README.md) Smart Contract *(Burner Wallet)*.
+* Updates `esim_profile` row with `wallet_address` on success.
+### 0.2 Transaction Execution
 
-### Building
-```bash
-# Build the library
-cargo build
+```python
+from scripts.core.wallet import create_phone_permit2_authorization
+from ape import project
 
-# Run tests
-cargo test
+# Create authorization
+wallet, signed_auth, _ = create_phone_permit2_authorization(
+    phone_number="+254712345678",
+    chain_id=1,
+    nonce=0
+)
 
-# Build with all features
-cargo build --all-features
+permit2 = project.Permit2WithOperatorOnlyERC1271.at(wallet)
+permit_hash = permit_transfer_from(
+    token_address,
+    amount,
+    operator.address,
+    operator.nonce,
+    2**256 - 1,
+    DOMAIN_SEPARATOR
+)
+signature = operator.sign_raw_msghash(permit_hash)
+
+# Execute permit transfer
+tx = permit2.permitTransferFrom(
+    (
+        (token_address, amount),
+        operator.nonce,
+        2**256 - 1,
+    ),
+    (recipient_address, amount),
+    wallet,
+    signature.encode_rsv(),
+    authorization=[signed_auth],
+    sender=operator
+)
+
 ```
-
-### Testing
-```bash
-# Unit tests
-cargo test
-
-# Integration tests (requires running Ethereum node)
-cargo test --test integration -- --ignored
-
-# Test against local testnet
-cargo test --features="testnet"
-```
-
-## Usage
-
-### Basic Setup
-```rust
-use ethclient::EthClient;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Connect to Ethereum node
-    let client = EthClient::new("http://localhost:8545")?;
-
-    // Get latest block
-    let block = client.get_latest_block().await?;
-    println!("Latest block: {}", block.number);
-
-    Ok(())
-}
-```
-
-### Wallet Operations
-```rust
-use ethclient::{EthClient, Wallet};
-
-async fn create_wallet() -> Result<(), Box<dyn std::error::Error>> {
-    let client = EthClient::new("http://localhost:8545")?;
-
-    // Create new wallet
-    let wallet = Wallet::new_random();
-
-    // Get balance
-    let balance = client.get_balance(wallet.address()).await?;
-    println!("Balance: {} ETH", balance);
-
-    Ok(())
-}
-```
-
-### Send Transaction
-```rust
-use ethclient::{EthClient, Transaction};
-use ethers::types::{U256, Address};
-
-async fn send_eth() -> Result<(), Box<dyn std::error::Error>> {
-    let client = EthClient::new("http://localhost:8545")?;
-
-    let tx = Transaction {
-        to: "0x742d35Cc6634C0532925a3b8D0A9E9B5F8C8C4C1".parse()?,
-        value: U256::from(1_000_000_000_000_000_000u64), // 1 ETH
-        gas_limit: 21000,
-        ..Default::default()
-    };
-
-    let tx_hash = client.send_transaction(tx).await?;
-    println!("Transaction sent: {}", tx_hash);
-
-    Ok(())
-}
-```
+*  Triggered **ONLY** on `eth_tx` row insert where `eth_tx.status=Pending` *(Transaction Execution)*.
+* Uses [Ape Framework](https://github.com/ApeWorX/ape) to sign and broadcast transactions.
 
 ## Configuration
 
-### Environment Variables
+Create a `.env` file with the following variables:
+
 ```env
-# Ethereum node endpoints
-ETH_RPC_URL=http://localhost:8545
-ETH_WS_URL=ws://localhost:8545
+# Web3 Provider (WebSocket recommended for production)
+WEB3_PROVIDER_URI=wss://mainnet.infura.io/ws/v3/YOUR-PROJECT-ID
 
-# Network configuration
-CHAIN_ID=1337
-NETWORK_NAME=localhost
+# Contract Addresses
+PERMIT2_7702_ADDRESS=0x000000000022D473030F116dDEE9F6B43aC78BA3
+ESIM_REGISTRY_ADDRESS=0x...
 
-# Gas configuration
-MAX_GAS_PRICE=100000000000  # 100 gwei
-GAS_MULTIPLIER=1.2
-
-# Wallet configuration
-WALLET_PRIVATE_KEY=0x...
-WALLET_MNEMONIC="word1 word2 ..."
+# Network Configuration
+CHAIN_ID=1  # Mainnet
 ```
 
-## File Structure
 
+### Wallet Management
+
+Create and manage wallets with phone-based authentication:
+
+```python
+from scripts.core.wallet import create_phone_permit2_authorization
+
+# Create a new wallet with phone authentication
+phone_number = "+254712345678"
+chain_id = 1  # Mainnet
+nonce = 0
+
+# Create wallet and get authorization
+wallet_address, signed_auth, phone_salt = create_phone_permit2_authorization(
+    phone_number=phone_number,
+    chain_id=chain_id,
+    nonce=nonce
+)
+print(f"Created wallet: {wallet_address}")
 ```
-ethclient/
-├── src/
-│   ├── lib.rs              # Main library interface
-│   ├── client.rs           # Ethereum JSON-RPC client
-│   ├── wallet.rs           # Wallet and key management
-│   ├── transaction.rs      # Transaction building and signing
-│   ├── contract.rs         # Smart contract interaction
-│   └── types.rs            # Common types and utilities
-├── tests/
-│   ├── integration/        # Integration tests
-│   └── unit/               # Unit tests
-├── examples/               # Usage examples
-├── Cargo.toml             # Dependencies and build config
-└── README.md              # This file
+
+### Permit2 Transactions
+
+Execute gasless transactions using Permit2:
+
+```python
+from scripts.core.wallet import create_phone_permit2_authorization
+from brownie import interface
+
+# Initialize Permit2 contract
+permit2 = interface.IPermit2(os.getenv('PERMIT2_7702_ADDRESS'))
+
+# Create authorization
+wallet, signed_auth, _ = create_phone_permit2_authorization(
+    phone_number="+254712345678",
+    chain_id=1,
+    nonce=0
+)
+
+# Execute permit transfer
+permit2.permitTransferFrom(
+    signed_auth,
+    {
+        'to': recipient_address,
+        'amount': amount,
+        'token': token_address
+    },
+    wallet,
+    {
+        'from': wallet
+    }
+)
 ```
 
-## Dependencies
+## Testing
 
-- `tokio` - Async runtime
-- `anyhow` - Error handling
-- `ethers` (planned) - Ethereum library
-- `secp256k1` (planned) - Cryptographic operations
-- `serde` (planned) - Serialization
-- `hex` (planned) - Hex encoding/decoding
+Run the test suite:
 
-## Integration with STK2ETH
+```bash
+# Install test dependencies
+pip install -r requirements-test.txt
 
-### USSD Flow Integration
-1. **User Request** - USSD client receives transaction request
-2. **SpacetimeDB** - ussdgeth module processes business logic
-3. **Ethereum Execution** - ethclient executes blockchain transaction
-4. **Confirmation** - Transaction hash returned to USSD client
+# Run tests
+ape test tests/ -v DEBUG
 
-### Account Abstraction
-- **Smart Wallet** - Deploy and manage AA wallets
-- **Meta-transactions** - Gasless transactions for users
-- **Batch Operations** - Multiple operations in single transaction
-- **Social Recovery** - Wallet recovery mechanisms
-
-## Security Considerations
-
-- **Private Key Management** - Secure storage and handling
-- **Transaction Validation** - Verify all transaction parameters
-- **Gas Limit Protection** - Prevent gas limit attacks
-- **Nonce Management** - Handle transaction ordering
-- **Network Validation** - Verify correct network connection
-
-## Testing Strategy
-
-### Unit Tests
-- Key generation and validation
-- Transaction building and encoding
-- Contract ABI encoding/decoding
-- Gas estimation algorithms
-
-### Integration Tests
-- End-to-end transaction flow
-- Smart contract deployment and interaction
-- Multi-signature wallet operations
-- Network failure handling
-
-### Load Tests
-- High-frequency transaction processing
-- Concurrent wallet operations
-- Memory usage under load
-- Connection pool management
-
-## Related Components
-
-- **ussdgeth** - SpacetimeDB module that calls ethclient functions
-- **ussdclient** - HTTP bridge that may trigger ethclient operations
-- **contracts** - Smart contracts that ethclient will deploy and interact with
+# Run specific test
+ape test tests/test_permit2_with_operator.py -v DEBUG
+```
