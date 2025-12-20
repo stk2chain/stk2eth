@@ -101,4 +101,6 @@ pool_manager.setOperator
 
 _mint + _settle :: Deposit
 _burn + _take  :: Withdraw
+
+Permit2WithOperatorOnlyERC1271
 '''
