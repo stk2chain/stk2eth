@@ -1,114 +1,165 @@
-# USSD Geth - SpacetimeDB Module
+# Middleware
 
-## Overview
+SpacetimeDB WASM module - USSD session logic + Swap processing + FATF audit
 
-The `ussdgeth` module is the core SpacetimeDB component of the STK2ETH project that handles USSD (Unstructured Supplementary Service Data) interactions for Ethereum transactions. This module enables users to perform Ethereum operations through SMS-like USSD menus without requiring internet connectivity.
+>**USSD (Unstructured Supplementary Service Data)** - a communications protocol used by GSM mobile phones to interact with a service provider's computers in real-time.
 
+## Build & Deploy
+
+```bash
+spacetime publish -c --server local --project-path ussdgeth gateway2
+```
 ## Architecture
+### 0.0 USSD Session
 
-This is a **SpacetimeDB module** compiled to WebAssembly (WASM) that provides:
-- USSD session management
-- Ethereum transaction processing
-- FATF compliance audit logging
-- Account abstraction wallet operations
+```rust
 
-## Key Components
+{
+  sessionId: String,       // unique per session
+  phoneNumber: String,     // user mobile number E.164 format
+  networkCode: String,     // telco network
+  serviceCode: String,     // USSD code for your app
+  text: String             // user input, concatenated with "*" for multi-step
+}
+```
 
-### Tables
-- `USSDSession` - Manages active USSD sessions with phone numbers and menu states
-- `Swap` - Records Ethereum swap transactions and their status
-- `EthAuditLog` - FATF-compliant audit trail for regulatory compliance
+* `text` contains **opCode** and **parameters**, e.g., *"1\*0.5\*0xRecipient"*.
 
-### Reducers (API Endpoints)
-- `send_eth()` - Processes ETH transfer requests
-- `log_send_eth_transaction()` - Creates audit logs for transactions
-- `log_send_eth_transaction_with_fatf()` - Enhanced FATF compliance logging
+### 0.1 Session Data (`"text"`)
 
-### Key Features
-- **USSD Menu Navigation** - State machine for USSD menu flows
-- **Session Management** - Tracks user interactions across USSD sessions
-- **Transaction Processing** - Handles ETH transfers and swaps
-- **Audit Logging** - FATF travel rule compliance with 100% persistence
-- **Immutable Records** - Tamper-proof transaction history
+Each USSD **opCode** maps to a **primitive** (basis function):
 
-## Development
+| opCode | Primitive  | Parameters                                     | Flow |
+| ------ | ---------- | ---------------------------------------------- |-------|
+| **`1`**  | **Register**   | `pin`, `confirm_pin`                              | **RegisterScreen** |
+| **`1`**  | **SendETH**   | `phone_number`, `amount`, `pin`                              | **MainScreen** |
+| **`2`**  | **Swap**       | `token_out`, `phone_number`, `amount_in`, `pin` | **MainScreen** |
+| **`3`**  | **Withdraw**   | `token`, `amount`, `pin`                                  | **MainScreen** |
+| **`4`**  | **Balance** | `token`, `pin`                                          | **MainScreen** |
 
-### Prerequisites
+**`SendETH` is treated as SendWETH** → always a **[WETH](https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) contract call**, no direct ETH transfer.
+
+### 0.2 User Registration
+* `is_registered[phone_number]` determines **screen flow**:
+  * `false` → *RegisterScreen* - registration flow (PIN entry & confirmation)
+  * `true` → *MainScreen* - main transaction menu
+
+* Registration is **mandatory** before executing **`MainScreen`** primitives.
+
+### 0.3 Transaction Encoding
+*  Each primitive converts to an **Ethereum transaction** (`EthTx`):
+```rust
+{
+  session_id: String,
+  to: String, // permit2 / Uniswap / Token
+  value: String,
+  data: String, // ABI-encoded function call (transfer, swapExactTokensForTokens, etc.)
+  gas_limit: String,
+  status: EthTxStatus,    
+  created_at: Timestamp,
+  updated_at: Timestamp,
+}
+```
+* **Shannon perspective**: minimal bits encode only necessary parameters.
+* **Fourier perspective**: each primitive is a deterministic basis function
+<!-- TODO: Account -->
+### 0.4 Flow
+
+1. Parse USSD input → `opCode + parameters`
+2. Determine screen via `is_registered[msg.sender]`
+3. Map to primitive → parameters
+4. Encode primitive → EthTx (`to`, `value`, `data`)
+5. Sign & broadcast → deterministic on-chain execution
+
+
+## Tables
+
+### `ussd_session`
+```rust
+session_id: String,          // Primary key
+current_screen: String,      // Menu state
+response_text: String,       // CON ... or END ...
+```
+
+### `pin`
+```rust
+phone_number: String,
+pin_hash: String,
+salt: String,
+```
+
+### `phone_wallet`
+```rust
+phone_number: String,
+wallet_address: String,
+```
+
+### `eth_tx`
+```rust
+session_id: String,
+to: String,          
+value: String,       
+data: String,          
+gas_limit: String,
+status: EthTxStatus,          // Pending/Processing/Completed/Failed/Canceled
+tx_hash: Option<String>
+```
+### `swap`
+```rust
+session_id: String,
+token_in: String,
+token_out: String,
+amount_in: String,
+amount_out: String,
+recipient: String,
+```
+
+### `eth_audit_logs`
+```rust
+tx_hash: String,
+from_address: String,
+to_address: String,
+amount: String,
+data: String,
+timestamp: Timestamp,
+```
+
+## Endpoints *(Reducers)*
+
+#### `process_ussd_step(session_id, phone, network, service, text)`
+#### `execute_ussd(session_id, phone, network, service, text)`
+#### `map_phone_to_wallet(phone, wallet)`
+
+## Session Data Format
+
+
+```rust
+"opCode*parameter1*parameter2*parameter3"
+
+Register : "1*pin*confirm_pin"
+SendETH  : "1*phone_number*amount*pin"
+Swap     : "2*token_out*amount_in*recipient"
+Withdraw : "3*token*amount*pin"
+Balance  : "4*token*pin"
+```
+
+## Query
+
 ```bash
-# Install SpacetimeDB CLI
-curl --proto '=https' --tlsv1.2 -sSf https://install.spacetimedb.com | sh
+# Get session
+spacetime sql gateway2 "SELECT * FROM ussd_session WHERE session_id = 'AT123'"
 
-# Add WASM target for Rust
-rustup target add wasm32-unknown-unknown
+# Get transaction
+spacetime sql gateway2 "SELECT * FROM eth_tx WHERE session_id = 'AT123'"
+
+# Get wallet
+spacetime sql gateway2 "SELECT * FROM phone_wallet WHERE phone_number = '+254712345678'"
 ```
+## Test
 
-### Building
 ```bash
-# Build the WASM module
-cargo build --target wasm32-unknown-unknown --release
-
-# Deploy to SpacetimeDB
-spacetime publish ussdgeth
+cargo test                    # Unit tests
+cargo test --test integration # Integration
+../stress_test.sh             # 1000+ TPS audit test
 ```
 
-### Testing
-```bash
-# Run unit tests
-cargo test
-
-# Run integration tests
-cargo test --test integration
-
-# Stress test audit logging (1000+ transactions)
-../stress_test.sh
-```
-
-## Usage
-
-### Starting SpacetimeDB
-```bash
-spacetime start
-```
-
-### Calling Reducers
-```bash
-# Log a transaction
-spacetime call ussdgeth log_send_eth_transaction "0xabc123" "0xfrom" "0xto" "1000000000000000000" "+254712345678" "session123"
-
-# Query audit logs
-spacetime sql ussdgeth "SELECT * FROM eth_audit_logs WHERE phone_number = '+254712345678'"
-```
-
-## File Structure
-
-```
-ussdgeth/
-├── src/
-│   ├── lib.rs              # Main module with table definitions
-│   ├── audit_reducers.rs   # FATF audit logging reducers
-│   └── audit_tests.rs      # Comprehensive test suite
-├── Cargo.toml             # Dependencies and build config
-└── README.md              # This file
-```
-
-## Dependencies
-
-- `spacetimedb` - Core SpacetimeDB functionality
-- `serde` - Serialization/deserialization
-- `log` - Logging framework
-- `anyhow` - Error handling
-- `thiserror` - Custom error types
-
-## Compliance
-
-This module implements **FATF (Financial Action Task Force) travel rule** compliance:
-- All transactions logged with originator/beneficiary information
-- Immutable audit trail with 100% persistence
-- Query performance under 30ms for 1000+ records
-- Regulatory reporting capabilities
-
-## Related Components
-
-- **ussdclient** - HTTP bridge for USSD gateway integration
-- **ethclient** - Ethereum blockchain interaction
-- **contracts** - Smart contracts for account abstraction

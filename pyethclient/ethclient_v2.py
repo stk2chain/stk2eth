@@ -42,17 +42,18 @@ def handle_esim(insert, stdb):
     logger.info(f"✓ eSIM profile: {phone_number}")
     logger.debug(f"  Wallet: {wallet_address}")
     
-    wallet, signed_auth, phone_salt = create_phone_burner_wallet(phone_number, 0)
-    logger.info(f"  Wallet: {wallet}")
-    logger.debug(f"  Auth: {signed_auth}")
-    logger.debug(f"  Phone Salt: {phone_salt}")
-    
-    try:
-        logger.debug(f"  → Calling map_phone_to_wallet")
-        stdb.call_reducer("map_phone_to_wallet", phone_number, wallet)
-        logger.info(f"  ✓ Saved")
-    except Exception as e:
-        logger.error(f"  ✗ Save failed: {e}")
+    if wallet_address == "":
+        wallet, signed_auth, phone_salt = create_phone_burner_wallet(phone_number, 0)
+        logger.info(f"  Wallet: {wallet}")
+        logger.debug(f"  Auth: {signed_auth}")
+        logger.debug(f"  Phone Salt: {phone_salt}")
+        
+        try:
+            logger.debug(f"  → Calling map_phone_to_wallet")
+            stdb.call_reducer("map_phone_to_wallet", phone_number, wallet)
+            logger.info(f"  ✓ Saved")
+        except Exception as e:
+            logger.error(f"  ✗ Save failed: {e}")
 
 def handle_swap(insert, stdb):
     """swap: data → parse → log (TODO: execute transfer)"""
