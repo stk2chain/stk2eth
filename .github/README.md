@@ -26,6 +26,11 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 ### Solution: 
 **An Account Abstraction eSIM ToolKit *(eSTK)*  and USSD Wallet that enables offline User Transaction relays over USSD. *(No internet required)*.**
 
+**Account Abstraction eSIM Wallet -: USSD → Ethereum → SMS (No internet required)**
+<!-- >**USSD (Unstructured Supplementary Service Data)** - a communications protocol used by GSM mobile phones to interact with a service provider's computers in real-time. -->
+
+<!-- >**eSTK (SIM Application Toolkit)** - a standard of the GSM system which enables the **SIM Card (Subscriber Identity Module)** initiate actions usable for various value-added services. A more general name for this class of **Java Card-based applications running on UICC cards** is the **Card Application Toolkit (CAT)**. -->
+
 <!-- Over **95% of the world's population has access to GSM networks** -->
 
 <!-- A protocol designed to **bridge traditional mobile networks *(GSM)*** with **blockchain systems**.  -->
@@ -100,6 +105,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 6. **Deploy smart contracts (local)**
    ```bash
    cd ../contracts
+   ape compile
    anvil &  # Start local Ethereum node
    forge build
    forge deploy
@@ -122,7 +128,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 
 | Component | Purpose | Technology | Status |
 |-----------|---------|------------|--------|                                       
-| [**ussdgeth**](../doc/specs/gateway.md) | Manages USSD sessions, stores state, and processes transactions | Rust/WASM/SpacetimeDB | ✅ Active |
+| [**ussdgeth**](../ussdgeth/README.md) | Manages USSD sessions, stores state, and processes transactions | Rust/WASM/SpacetimeDB | ✅ Active |
 | [**ussdclient**](../ussdclient/README.md) | Connects USSD gateways to SpacetimeDB and relays response via HTTP/Websocket | Rust/Axum | ✅ Active |
 | [**ethclient**](../ethclient/README.md) | Sends and manages On Chain transactions | Rust | ✅ Active |
 | [**smsclient**](../ussd/README.md) | Sends transaction notifications via SMS | Rust/WASM | 🚧 In Development |
