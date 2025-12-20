@@ -104,11 +104,10 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    ```
 6. **Deploy smart contracts (local)**
    ```bash
-   cd ../contracts
-   ape compile
+   cd ../pyethclient/contracts
    anvil &  # Start local Ethereum node
-   forge build
-   forge deploy
+   ape run deploy
+   ```
 
 ### Ngrok Callback URL (For Sandbox Testing)
 1. Start ngrok to expose `ussdclient`'s HTTP Port
