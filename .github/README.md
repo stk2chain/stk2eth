@@ -131,7 +131,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 | [**ussdclient**](../ussdclient/README.md) | Connects USSD gateways to SpacetimeDB and relays response via HTTP/Websocket | Rust/Axum | ✅ Active |
 | [**ethclient**](../ethclient/README.md) | Sends and manages On Chain transactions | Rust | ✅ Active |
 | [**smsclient**](../ussd/README.md) | Sends transaction notifications via SMS | Rust/WASM | 🚧 In Development |
-| [**contracts**](../contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
+| [**contracts**](../ethclient/contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
 | [**eSTK**](../doc/specs/applet.md) | eSIM JavaCard Applet Wallet over USSD | JavaCard | 🚧 In Development |
 
 
