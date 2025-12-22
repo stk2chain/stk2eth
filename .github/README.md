@@ -94,7 +94,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    ```
 4. **Start ETH client**
    ```bash
-   cd ../client
+   cd ../ethclient
    python ethclient.py
    ```
 5. **Start SMS client**

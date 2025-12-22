@@ -32,6 +32,11 @@
 			"text": "Confirm PIN",
 			"screen_type": "Function",
 			"function": "confirm_register_pin",
+			"default_next_screen": "RegisterSuccessScreen"
+		},
+		"RegisterSuccessScreen": {
+			"text": "Successfully Registered!\nRedial to Enjoy Services!",
+			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
 		},
 		"MainScreen": {
