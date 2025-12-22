@@ -89,7 +89,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    (You may replace `gateway2` with any valid URL-safe name.)
 3. **Start USSD client**
    ```bash
-   cd ../client
+   cd ../ussdclient
    python ussdclient.py
    ```
 4. **Start ETH client**
@@ -134,3 +134,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 | [**contracts**](../contracts/README.md) | Smart contracts for eSIM registry and account abstraction | Solidity/Ape | ✅ Active |
 | [**eSTK**](../doc/specs/applet.md) | eSIM JavaCard Applet Wallet over USSD | JavaCard | 🚧 In Development |
 
+
+<br/>
+
+### [System Architecture](https://excalidraw.com/#room=719768eae4668baa540a,Bqn71eaiwgKtS8TGFQQ3qg)
