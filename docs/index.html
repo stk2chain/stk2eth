@@ -1,0 +1,1968 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8" data-mc-element-id="44">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-mc-element-id="71">
+    <title data-mc-element-id="146">STK2Chain - GSM → Ethereum Bridge Protocol</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0D1117;
+            color: #C9D1D9;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        a {
+            color: #58A6FF;
+            text-decoration: none;
+            transition: color 0.2s ease-in-out;
+        }
+
+        a:hover {
+            color: #79C0FF;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Navigation */
+        nav {
+            background-color: #161B22;
+            border-bottom: 1px solid #21262D;
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: #58A6FF;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            list-style: none;
+        }
+
+        .nav-links a {
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .github-star {
+            background-color: #21262D;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #30363D;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+
+        .github-star:hover {
+            background-color: #30363D;
+            border-color: #58A6FF;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0 120px;
+        }
+
+        .hero-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: start;
+        }
+
+        .hero-left h1 {
+            font-size: 48px;
+            font-weight: 700;
+            color: #58A6FF;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .hero-left .subheading {
+            font-size: 18px;
+            color: #8B949E;
+            margin-bottom: 48px;
+            line-height: 1.5;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            background-color: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 40px;
+        }
+
+        .diagram-title {
+            font-size: 14px;
+            color: #8B949E;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .layer {
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        .layer:hover {
+            border-color: #58A6FF;
+            transform: translateX(4px);
+            background-color: #161B22;
+        }
+
+        .layer:hover .layer-detail {
+            opacity: 1;
+            max-height: 100px;
+        }
+
+        .layer-number {
+            position: absolute;
+            top: 20px;
+            left: -12px;
+            background-color: #58A6FF;
+            color: #0D1117;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .layer-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #C9D1D9;
+            margin-bottom: 8px;
+        }
+
+        .layer-desc {
+            font-size: 14px;
+            color: #8B949E;
+        }
+
+        .layer-detail {
+            font-size: 12px;
+            color: #58A6FF;
+            margin-top: 12px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .arrow-down {
+            text-align: center;
+            color: #58A6FF;
+            font-size: 24px;
+            margin: -8px 0;
+        }
+
+        /* Code Block */
+        .code-block {
+            background-color: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background-color: #0D1117;
+            border-bottom: 1px solid #30363D;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-lang {
+            font-size: 12px;
+            color: #8B949E;
+            text-transform: uppercase;
+        }
+
+        .copy-btn {
+            background-color: #21262D;
+            border: 1px solid #30363D;
+            color: #8B949E;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .copy-btn:hover {
+            background-color: #30363D;
+            border-color: #58A6FF;
+            color: #58A6FF;
+        }
+
+        .copy-btn.copied {
+            background-color: #238636;
+            border-color: #238636;
+            color: #fff;
+        }
+
+        .code-content {
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .code-line {
+            display: block;
+        }
+
+        .comment {
+            color: #8B949E;
+        }
+
+        .command {
+            color: #FF7B72;
+        }
+
+        .string {
+            color: #A5D6FF;
+        }
+
+        /* CTAs */
+        .cta-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: #238636;
+            color: #fff;
+            border: 1px solid #238636;
+        }
+
+        .btn-primary:hover {
+            background-color: #2EA043;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: #58A6FF;
+            border: 1px solid #30363D;
+        }
+
+        .btn-secondary:hover {
+            background-color: #21262D;
+            border-color: #58A6FF;
+            transform: translateY(-2px);
+        }
+
+        .btn-tertiary {
+            background-color: transparent;
+            color: #8B949E;
+            border: 1px solid #30363D;
+        }
+
+        .btn-tertiary:hover {
+            background-color: #21262D;
+            border-color: #8B949E;
+            color: #C9D1D9;
+            transform: translateY(-2px);
+        }
+
+        /* Problem Section */
+        .problem-section {
+            padding: 80px 0;
+            background-color: #161B22;
+            border-top: 1px solid #21262D;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-label {
+            font-size: 14px;
+            color: #F85149;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 36px;
+            font-weight: 700;
+            color: #C9D1D9;
+            margin-bottom: 16px;
+        }
+
+        .section-desc {
+            font-size: 18px;
+            color: #8B949E;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            margin-bottom: 60px;
+        }
+
+        .stat-card {
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .stat-card:hover {
+            border-color: #58A6FF;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(88, 166, 255, 0.1);
+        }
+
+        .stat-number {
+            font-size: 48px;
+            font-weight: 700;
+            color: #F85149;
+            margin-bottom: 12px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #8B949E;
+        }
+
+        /* Solution Section */
+        .solution-section {
+            padding: 80px 0;
+        }
+
+        .solution-section .section-label {
+            color: #238636;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background-color: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 32px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .feature-card:hover {
+            border-color: #238636;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(35, 134, 54, 0.1);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background-color: #238636;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #C9D1D9;
+            margin-bottom: 12px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #8B949E;
+            line-height: 1.6;
+        }
+
+        /* Protocol Components Section */
+        .components-section {
+            padding: 80px 0;
+            background-color: #161B22;
+            border-top: 1px solid #21262D;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .components-section .section-label {
+            color: #A371F7;
+        }
+
+        .tab-container {
+            margin-top: 60px;
+        }
+
+        .tab-header {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #30363D;
+            margin-bottom: 40px;
+        }
+
+        .tab-button {
+            background-color: transparent;
+            border: none;
+            color: #8B949E;
+            padding: 16px 32px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            color: #C9D1D9;
+            background-color: #0D1117;
+        }
+
+        .tab-button.active {
+            color: #58A6FF;
+            border-bottom-color: #58A6FF;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .component-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        .component-card {
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .component-card h4 {
+            font-size: 16px;
+            color: #C9D1D9;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .component-card h4 i {
+            color: #58A6FF;
+        }
+
+        .component-list {
+            list-style: none;
+        }
+
+        .component-list li {
+            font-size: 14px;
+            color: #8B949E;
+            padding: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .component-list li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: #58A6FF;
+        }
+
+        .warning-box {
+            background-color: #422006;
+            border: 1px solid #9E6A03;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .warning-box h4 {
+            color: #FFA657;
+            font-size: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .warning-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .warning-box li {
+            color: #FFA657;
+            font-size: 13px;
+            padding: 4px 0;
+        }
+
+        .code-example {
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 24px;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .code-example .keyword {
+            color: #FF7B72;
+        }
+
+        .code-example .function {
+            color: #D2A8FF;
+        }
+
+        .code-example .string {
+            color: #A5D6FF;
+        }
+
+        .view-source-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #58A6FF;
+            font-size: 14px;
+            margin-top: 24px;
+            padding: 10px 16px;
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .view-source-link:hover {
+            background-color: #21262D;
+            border-color: #58A6FF;
+            transform: translateY(-2px);
+        }
+
+        /* Roadmap */
+        .roadmap-section {
+            padding: 80px 0;
+        }
+
+        .roadmap-section .section-label {
+            color: #D29922;
+        }
+
+        .timeline {
+            margin-top: 60px;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #58A6FF 0%, #A371F7 100%);
+            transform: translateX(-50%);
+        }
+
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        .timeline-item:nth-child(even) .timeline-content {
+            grid-column: 1;
+            text-align: right;
+        }
+
+        .timeline-item:nth-child(even) .timeline-empty {
+            grid-column: 2;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 50%;
+            top: 24px;
+            width: 20px;
+            height: 20px;
+            background-color: #58A6FF;
+            border: 4px solid #0D1117;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+        }
+
+        .timeline-content {
+            background-color: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 32px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .timeline-content:hover {
+            border-color: #58A6FF;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(88, 166, 255, 0.1);
+        }
+
+        .timeline-phase {
+            font-size: 12px;
+            color: #58A6FF;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .timeline-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #C9D1D9;
+            margin-bottom: 12px;
+        }
+
+        .timeline-desc {
+            font-size: 14px;
+            color: #8B949E;
+            margin-bottom: 16px;
+        }
+
+        .timeline-budget {
+            font-size: 14px;
+            color: #238636;
+            font-weight: 600;
+        }
+
+        .timeline-deliverables {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #30363D;
+        }
+
+        .deliverable-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #8B949E;
+        }
+
+        .deliverable-item i {
+            color: #238636;
+        }
+
+        /* Bounty Board */
+        .bounty-section {
+            padding: 80px 0;
+            background-color: #161B22;
+            border-top: 1px solid #21262D;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .bounty-section .section-label {
+            color: #FFA657;
+        }
+
+        .bounty-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .bounty-card {
+            background-color: #0D1117;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+        }
+
+        .bounty-card:hover {
+            border-color: #FFA657;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(255, 166, 87, 0.1);
+        }
+
+        .bounty-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .bounty-amount {
+            background-color: #238636;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .bounty-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #C9D1D9;
+            margin-bottom: 8px;
+        }
+
+        .bounty-desc {
+            font-size: 14px;
+            color: #8B949E;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .bounty-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .bounty-tag {
+            background-color: #21262D;
+            color: #58A6FF;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            border: 1px solid #30363D;
+        }
+
+        .bounty-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid #30363D;
+        }
+
+        .bounty-status {
+            font-size: 12px;
+            color: #F85149;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Community Section */
+        .community-section {
+            padding: 80px 0;
+        }
+
+        .community-section .section-label {
+            color: #D29922;
+        }
+
+        .principles-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+            margin-bottom: 60px;
+        }
+
+        .principle-card {
+            background-color: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 32px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .principle-card:hover {
+            border-color: #D29922;
+            transform: translateY(-4px);
+        }
+
+        .principle-number {
+            display: inline-block;
+            background-color: #D29922;
+            color: #0D1117;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .principle-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #C9D1D9;
+            margin-bottom: 12px;
+        }
+
+        .principle-desc {
+            font-size: 14px;
+            color: #8B949E;
+            line-height: 1.6;
+        }
+
+        .community-cta {
+            background: linear-gradient(135deg, #161B22 0%, #0D1117 100%);
+            border: 1px solid #30363D;
+            border-radius: 12px;
+            padding: 60px;
+            text-align: center;
+        }
+
+        .community-cta h3 {
+            font-size: 32px;
+            color: #C9D1D9;
+            margin-bottom: 16px;
+        }
+
+        .community-cta p {
+            font-size: 18px;
+            color: #8B949E;
+            margin-bottom: 32px;
+        }
+
+        /* Footer */
+        footer {
+            background-color: #161B22;
+            border-top: 1px solid #21262D;
+            padding: 60px 0 32px;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 40px;
+        }
+
+        .footer-brand h3 {
+            font-size: 20px;
+            color: #58A6FF;
+            margin-bottom: 16px;
+        }
+
+        .footer-brand p {
+            font-size: 14px;
+            color: #8B949E;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .social-link {
+            width: 40px;
+            height: 40px;
+            background-color: #21262D;
+            border: 1px solid #30363D;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .social-link:hover {
+            background-color: #58A6FF;
+            border-color: #58A6FF;
+            transform: translateY(-2px);
+        }
+
+        .social-link:hover i {
+            color: #0D1117;
+        }
+
+        .footer-column h4 {
+            font-size: 14px;
+            color: #C9D1D9;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+
+        .footer-links a {
+            font-size: 14px;
+            color: #8B949E;
+        }
+
+        .footer-links a:hover {
+            color: #58A6FF;
+        }
+
+        .footer-bottom {
+            padding-top: 32px;
+            border-top: 1px solid #21262D;
+            text-align: center;
+            font-size: 14px;
+            color: #8B949E;
+        }
+
+        .footer-bottom a {
+            color: #58A6FF;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .component-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline::before {
+                left: 20px;
+            }
+
+            .timeline-item {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline-dot {
+                left: 20px;
+            }
+
+            .timeline-item:nth-child(even) .timeline-content {
+                grid-column: 1;
+                text-align: left;
+            }
+
+            .timeline-content {
+                margin-left: 60px;
+            }
+
+            .bounty-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .principles-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                gap: 16px;
+                font-size: 12px;
+            }
+
+            .hero {
+                padding: 40px 0 60px;
+            }
+
+            .hero-left h1 {
+                font-size: 32px;
+            }
+
+            .hero-left .subheading {
+                font-size: 16px;
+            }
+
+            .section-title {
+                font-size: 28px;
+            }
+
+            .section-desc {
+                font-size: 16px;
+            }
+
+            .tab-header {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+
+            .tab-button {
+                padding: 12px 20px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav data-mc-element-id="26583">
+        <div class="container" data-mc-element-id="26597">
+            <div class="logo" data-mc-element-id="26633">STK2Chain</div>
+            <ul class="nav-links" data-mc-element-id="26679">
+                <li data-mc-element-id="26718"><a href="#docs" data-mc-element-id="26722">Docs</a></li>
+                <li data-mc-element-id="26768"><a href="#components" data-mc-element-id="26772">Components</a></li>
+                <li data-mc-element-id="26830"><a href="#bounties" data-mc-element-id="26834">Bounties</a></li>
+                <li data-mc-element-id="26888"><a href="#community" data-mc-element-id="26892">Community</a></li>
+                <li data-mc-element-id="26948">
+                    <a href="https://github.com/stk2chain" class="github-star" data-mc-element-id="26973">
+                        <i class="fab fa-github" data-mc-element-id="27057"></i>
+                        <span data-mc-element-id="27111">Star</span>
+                        <span style="color: #8B949E;" data-mc-element-id="27153">1.2k</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" data-mc-element-id="27317">
+        <div class="container" data-mc-element-id="27348">
+            <div class="hero-content" data-mc-element-id="27384">
+                <div class="hero-left" data-mc-element-id="27427">
+                    <h1 data-mc-element-id="27471">Bringing Blockchain to 2.5B+ Offline Users</h1>
+                    <p class="subheading" data-mc-element-id="27543">Open-source middleware enabling blockchain transactions via USSD/SMS and SIM Toolkit. No internet required.</p>
+
+                    <div class="architecture-diagram" data-mc-element-id="27772">
+                        <div class="diagram-title" data-mc-element-id="27831">Protocol Architecture</div>
+
+                        <div class="layer" data-mc-element-id="27935">
+                            <div class="layer-number" data-mc-element-id="27983">1</div>
+                            <div class="layer-name" data-mc-element-id="28045">User Layer</div>
+                            <div class="layer-desc" data-mc-element-id="28114">SIM Card + USSD/STK Interface</div>
+                            <div class="layer-detail" data-mc-element-id="28197">→ USSD/STK Menu: Wallet operations via familiar mobile interface</div>
+                        </div>
+                        <div class="arrow-down" data-mc-element-id="28344">↓</div>
+
+                        <div class="layer" data-mc-element-id="28425">
+                            <div class="layer-number" data-mc-element-id="28473">2</div>
+                            <div class="layer-name" data-mc-element-id="28535">Network Layer</div>
+                            <div class="layer-desc" data-mc-element-id="28607">GSM/2G/3G/LTE Bearer</div>
+                            <div class="layer-detail" data-mc-element-id="28686">→ USSD/SMS Transport: Transaction intents over cellular</div>
+                        </div>
+                        <div class="arrow-down" data-mc-element-id="28834">↓</div>
+
+                        <div class="layer" data-mc-element-id="28915">
+                            <div class="layer-number" data-mc-element-id="28963">3</div>
+                            <div class="layer-name" data-mc-element-id="29025">Middleware Layer</div>
+                            <div class="layer-desc" data-mc-element-id="29100">Transaction Relay + Mempool</div>
+                            <div class="layer-detail" data-mc-element-id="29186">→ Intent Parser: Converts USSD/SMS to signed blockchain transactions</div>
+                        </div>
+                        <div class="arrow-down" data-mc-element-id="29337">↓</div>
+
+                        <div class="layer" data-mc-element-id="29418">
+                            <div class="layer-number" data-mc-element-id="29466">4</div>
+                            <div class="layer-name" data-mc-element-id="29528">Chain Layer</div>
+                            <div class="layer-desc" data-mc-element-id="29598">Ethereum Node</div>
+                            <div class="layer-detail" data-mc-element-id="29670">→ Transaction Execution: On-chain settlement and confirmation</div>
+                        </div>
+                    </div>
+
+                    <div class="cta-group" data-mc-element-id="29843">
+                        <button class="btn btn-primary" data-mc-element-id="29891">
+                            <i class="fab fa-github" data-mc-element-id="29952"></i>
+                            Browse Code
+                        </button>
+                        <button class="btn btn-secondary" data-mc-element-id="30080">
+                            <i class="fas fa-book" data-mc-element-id="30143"></i>
+                            Read Docs
+                        </button>
+                        <button class="btn btn-tertiary" data-mc-element-id="30267">
+                            <i class="fas fa-coins" data-mc-element-id="30329"></i>
+                            Claim Bounty
+                        </button>
+                    </div>
+                </div>
+
+                <div class="hero-right" data-mc-element-id="30500">
+                    <div class="code-block" data-mc-element-id="30545">
+                        <div class="code-header" data-mc-element-id="30594">
+                            <span class="code-lang" data-mc-element-id="30648">bash</span>
+                            <button class="copy-btn" onclick="copyCode(this)" data-mc-element-id="30712">
+                                <i class="fas fa-copy" data-mc-element-id="30795"></i> Copy
+                            </button>
+                        </div>
+                        <div class="code-content" data-mc-element-id="30921">
+                            <span class="code-line comment" data-mc-element-id="30976"># Clone the repo</span>
+                            <span class="code-line" data-mc-element-id="31060"><span class="command" data-mc-element-id="31084">git clone</span> <span class="string" data-mc-element-id="31123">https://github.com/stk2chain/stk2eth</span></span>
+                            <span class="code-line" data-mc-element-id="31224">&nbsp;</span>
+                            <span class="code-line comment" data-mc-element-id="31290"># Run local node</span>
+                            <span class="code-line" data-mc-element-id="31374"><span class="command" data-mc-element-id="31398">make</span> dev</span>
+                            <span class="code-line" data-mc-element-id="31485">&nbsp;</span>
+                            <span class="code-line comment" data-mc-element-id="31551"># Test USSD/SMS → ETH relay</span>
+                            <span class="code-line" data-mc-element-id="31641"><span class="command" data-mc-element-id="31665">make</span> test</span>
+                            <span class="code-line" data-mc-element-id="31742">&nbsp;</span>
+                            <span class="code-line comment" data-mc-element-id="31808"># Expected output:</span>
+                            <span class="code-line" style="color: #238636;" data-mc-element-id="31894">✓ USSD received and parsed</span>
+                            <span class="code-line" style="color: #238636;" data-mc-element-id="32003">✓ Transaction signed</span>
+                            <span class="code-line" style="color: #238636;" data-mc-element-id="32107">✓ Relayed to Ethereum</span>
+                            <span class="code-line" style="color: #238636;" data-mc-element-id="32212">✓ Confirmation SMS sent</span>
+                            <span class="code-line" data-mc-element-id="32319">&nbsp;</span>
+                            <span class="code-line" style="color: #8B949E;" data-mc-element-id="32385">Latency: 12.3s | Gas: 0.0001 ETH</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem-section" data-mc-element-id="32637">
+        <div class="container" data-mc-element-id="32679">
+            <div class="section-header" data-mc-element-id="32715">
+                <div class="section-label" data-mc-element-id="32760">[ NEED ]</div>
+                <h2 class="section-title" data-mc-element-id="32818">Blockchain Accessibility for 2.5B+ Offline Users</h2>
+                <p class="section-desc" data-mc-element-id="32914">The infrastructure gap preventing billions from participating in decentralized economies</p>
+            </div>
+
+            <div class="stats-grid" data-mc-element-id="33063">
+                <div class="stat-card" data-mc-element-id="33104">
+                    <div class="stat-number" data-mc-element-id="33148">2.5B+</div>
+                    <div class="stat-label" data-mc-element-id="33205">People without stable internet access</div>
+                </div>
+                <div class="stat-card" data-mc-element-id="33312">
+                    <div class="stat-number" data-mc-element-id="33356">90%</div>
+                    <div class="stat-label" data-mc-element-id="33411">Global GSM network coverage</div>
+                </div>
+                <div class="stat-card" data-mc-element-id="33508">
+                    <div class="stat-number" data-mc-element-id="33552">$1B+</div>
+                    <div class="stat-label" data-mc-element-id="33608">Daily Mobile-Money transaction volume</div>
+                </div>
+            </div>
+
+            <div class="features-grid" data-mc-element-id="33725">
+                <div class="feature-card" data-mc-element-id="33769">
+                    <div class="feature-icon" data-mc-element-id="33816">
+                        <i class="fas fa-wifi-slash" data-mc-element-id="33867"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="33948">Limited Internet Access</div>
+                    <div class="feature-desc" data-mc-element-id="34025">Blockchain adoption is hindered in regions with unreliable or expensive internet connectivity. Current Web3 infrastructure excludes billions of potential users.</div>
+                </div>
+                <div class="feature-card" data-mc-element-id="34257">
+                    <div class="feature-icon" data-mc-element-id="34304">
+                        <i class="fas fa-door-closed" data-mc-element-id="34355"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="34437">High Onboarding Barriers</div>
+                    <div class="feature-desc" data-mc-element-id="34515">Current blockchain wallets and dapps are internet-dependent with complex UX. Users need smartphones, data plans, and technical knowledge to participate.</div>
+                </div>
+                <div class="feature-card" data-mc-element-id="34739">
+                    <div class="feature-icon" data-mc-element-id="34786">
+                        <i class="fas fa-chart-line" data-mc-element-id="34837"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="34918">Mass Adoption Gap</div>
+                    <div class="feature-desc" data-mc-element-id="34989">Existing blockchain solutions don't cater to the billions of users reliant on basic mobile devices. We need infrastructure that meets users where they are.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Section -->
+    <section class="solution-section" data-mc-element-id="35284">
+        <div class="container" data-mc-element-id="35327">
+            <div class="section-header" data-mc-element-id="35363">
+                <div class="section-label" data-mc-element-id="35408">[ SOLUTION ]</div>
+                <h2 class="section-title" data-mc-element-id="35470">Bridge GSM → Ethereum</h2>
+                <p class="section-desc" data-mc-element-id="35539">Leverage ubiquitous GSM infrastructure to enable blockchain access for everyone</p>
+            </div>
+
+            <div class="features-grid" data-mc-element-id="35679">
+                <div class="feature-card" data-mc-element-id="35723">
+                    <div class="feature-icon" data-mc-element-id="35770">
+                        <i class="fas fa-satellite-dish" data-mc-element-id="35821"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="35906">Offline Functionality</div>
+                    <div class="feature-desc" data-mc-element-id="35981">Unlike internet-dependent wallets, STK2Chain operates primarily on GSM networks. Send ETH, check balances, and interact with smart contracts via SMS.</div>
+                </div>
+                <div class="feature-card" data-mc-element-id="36202">
+                    <div class="feature-icon" data-mc-element-id="36249">
+                        <i class="fas fa-mobile-alt" data-mc-element-id="36300"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="36381">Ease of Use</div>
+                    <div class="feature-desc" data-mc-element-id="36446">Familiar STK-based interfaces ensure low learning curves. Users interact with blockchain through the same menu system they use for mobile money.</div>
+                </div>
+                <div class="feature-card" data-mc-element-id="36662">
+                    <div class="feature-icon" data-mc-element-id="36709">
+                        <i class="fas fa-globe-africa" data-mc-element-id="36760"></i>
+                    </div>
+                    <div class="feature-title" data-mc-element-id="36843">Massive Scalability</div>
+                    <div class="feature-desc" data-mc-element-id="36916">Design supports rapid deployment in regions with high mobile penetration but low internet coverage. Works on any phone with a SIM card.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Protocol Components Section -->
+    <section class="components-section" id="components" data-mc-element-id="37202">
+        <div class="container" data-mc-element-id="37263">
+            <div class="section-header" data-mc-element-id="37299">
+                <div class="section-label" data-mc-element-id="37344">[ SCOPE ]</div>
+                <h2 class="section-title" data-mc-element-id="37403">Protocol Components</h2>
+                <p class="section-desc" data-mc-element-id="37470">Technical specifications and implementation details</p>
+            </div>
+
+            <div class="tab-container" data-mc-element-id="37582">
+                <div class="tab-header" data-mc-element-id="37626">
+                    <button class="tab-button active" onclick="openTab(event, 'esim')" data-mc-element-id="37671">eSIM Profile</button>
+                    <button class="tab-button" onclick="openTab(event, 'stk')" data-mc-element-id="37780">STK Applet</button>
+                    <button class="tab-button" onclick="openTab(event, 'middleware')" data-mc-element-id="37879">Middleware</button>
+                    <button class="tab-button" onclick="openTab(event, 'chain')" data-mc-element-id="37985">Chain Integration</button>
+                </div>
+
+                <!-- eSIM Profile Tab -->
+                <div id="esim" class="tab-content active" data-mc-element-id="38155">
+                    <div class="component-grid" data-mc-element-id="38218">
+                        <div class="component-card" data-mc-element-id="38271">
+                            <h4 data-mc-element-id="38328"><i class="fas fa-signal" data-mc-element-id="38332"></i> Bearer Types</h4>
+                            <ul class="component-list" data-mc-element-id="38408">
+                                <li data-mc-element-id="38468">GSM (2G) - Basic SMS transport</li>
+                                <li data-mc-element-id="38540">2.5G (GPRS/EDGE) - Enhanced data</li>
+                                <li data-mc-element-id="38614">3G (UMTS/HSPA) - Faster relay</li>
+                                <li data-mc-element-id="38685">LTE (4G) - Optimized latency</li>
+                                <li data-mc-element-id="38755">BIC - Bearer Independent Protocol</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card" data-mc-element-id="38888">
+                            <h4 data-mc-element-id="38945"><i class="fas fa-lock" data-mc-element-id="38949"></i> Security Model</h4>
+                            <ul class="component-list" data-mc-element-id="39025">
+                                <li data-mc-element-id="39085">Hardware-backed key storage</li>
+                                <li data-mc-element-id="39154">Secure Element integration</li>
+                                <li data-mc-element-id="39222">PIN-protected transaction signing</li>
+                                <li data-mc-element-id="39297">Encrypted SMS communication</li>
+                                <li data-mc-element-id="39366">eUICC security framework</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="code-example" data-mc-element-id="39513">
+<span class="comment" data-mc-element-id="39540">// eSIM Profile Structure</span>
+<span class="keyword" data-mc-element-id="39595">const</span> eSIMProfile = {
+  <span class="string" data-mc-element-id="39648">iccid</span>: <span class="string" data-mc-element-id="39683">"89014103211118510720"</span>,
+  <span class="string" data-mc-element-id="39737">imsi</span>: <span class="string" data-mc-element-id="39771">"310410123456789"</span>,
+  <span class="string" data-mc-element-id="39820">bearer</span>: [<span class="string" data-mc-element-id="39857">"GSM"</span>, <span class="string" data-mc-element-id="39892">"LTE"</span>],
+  <span class="string" data-mc-element-id="39930">securityDomain</span>: {
+    <span class="string" data-mc-element-id="39980">type</span>: <span class="string" data-mc-element-id="40014">"GlobalPlatform"</span>,
+    <span class="string" data-mc-element-id="40064">keyStorage</span>: <span class="string" data-mc-element-id="40104">"SecureElement"</span>,
+    <span class="string" data-mc-element-id="40153">applets</span>: [<span class="string" data-mc-element-id="40191">"STK2Chain"</span>]
+  }
+};
+                    </div>
+
+                    <a href="https://github.com/stk2chain/esim-profile" class="view-source-link" data-mc-element-id="40287">
+                        <i class="fab fa-github" data-mc-element-id="40389"></i>
+                        View source code
+                    </a>
+                </div>
+
+                <!-- STK Applet Tab -->
+                <div id="stk" class="tab-content" data-mc-element-id="40565">
+                    <div class="component-card" data-mc-element-id="40620">
+                        <h4 data-mc-element-id="40673"><i class="fas fa-list" data-mc-element-id="40677"></i> Menu Flow</h4>
+                        <ul class="component-list" data-mc-element-id="40744">
+                            <li data-mc-element-id="40800">1. Deposit - Display wallet address</li>
+                            <li data-mc-element-id="40873">2. Send ETH - Enter recipient &amp; amount</li>
+                            <li data-mc-element-id="40949">3. Check Balance - Query current holdings</li>
+                            <li data-mc-element-id="41028">4. Swap - Token exchange interface</li>
+                            <li data-mc-element-id="41100">5. Smart Contracts - Interact with dApps</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-grid" data-mc-element-id="41228">
+                        <div class="component-card" data-mc-element-id="41281">
+                            <h4 data-mc-element-id="41338"><i class="fas fa-pen" data-mc-element-id="41342"></i> Transaction Signing</h4>
+                            <ul class="component-list" data-mc-element-id="41422">
+                                <li data-mc-element-id="41482">PIN-based authentication</li>
+                                <li data-mc-element-id="41548">Transaction preview before signing</li>
+                                <li data-mc-element-id="41624">Gas fee estimation display</li>
+                                <li data-mc-element-id="41692">Confirmation prompts</li>
+                                <li data-mc-element-id="41754">SMS notification on completion</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card" data-mc-element-id="41884">
+                            <h4 data-mc-element-id="41941"><i class="fas fa-envelope" data-mc-element-id="41945"></i> SMS Notifications</h4>
+                            <ul class="component-list" data-mc-element-id="42028">
+                                <li data-mc-element-id="42088">Send/Receive confirmations</li>
+                                <li data-mc-element-id="42156">Balance updates</li>
+                                <li data-mc-element-id="42213">Transaction status</li>
+                                <li data-mc-element-id="42273">Encrypted sensitive data</li>
+                                <li data-mc-element-id="42339">Gas fee alerts</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="code-example" data-mc-element-id="42476">
+<span class="comment" data-mc-element-id="42503">// STK Menu Initialization</span>
+<span class="keyword" data-mc-element-id="42559">public class</span> <span class="function" data-mc-element-id="42601">STK2ChainApplet</span> <span class="keyword" data-mc-element-id="42647">extends</span> Applet {
+  <span class="keyword" data-mc-element-id="42695">private static final byte</span> MENU_DEPOSIT = 0x01;
+  <span class="keyword" data-mc-element-id="42773">private static final byte</span> MENU_SEND = 0x02;
+  <span class="keyword" data-mc-element-id="42848">private static final byte</span> MENU_BALANCE = 0x03;
+
+  <span class="keyword" data-mc-element-id="42929">public void</span> <span class="function" data-mc-element-id="42970">process</span>(APDU apdu) {
+    <span class="keyword" data-mc-element-id="43025">byte</span>[] buffer = apdu.getBuffer();
+    <span class="keyword" data-mc-element-id="43092">switch</span> (buffer[ISO7816.OFFSET_INS]) {
+      <span class="keyword" data-mc-element-id="43165">case</span> MENU_SEND:
+        <span class="function" data-mc-element-id="43218">handleSendTransaction</span>(apdu);
+        <span class="keyword" data-mc-element-id="43285">break</span>;
+    }
+  }
+}
+                    </div>
+
+                    <a href="https://github.com/stk2chain/stk-applet" class="view-source-link" data-mc-element-id="43381">
+                        <i class="fab fa-github" data-mc-element-id="43481"></i>
+                        View source code
+                    </a>
+                </div>
+
+                <!-- Middleware Tab -->
+                <div id="middleware" class="tab-content" data-mc-element-id="43657">
+                    <div class="warning-box" data-mc-element-id="43719">
+                        <h4 data-mc-element-id="43769"><i class="fas fa-exclamation-triangle" data-mc-element-id="43773"></i> Open Research Questions</h4>
+                        <ul data-mc-element-id="43870">
+                            <li data-mc-element-id="43903">→ Self custodian or delegated signing model?</li>
+                            <li data-mc-element-id="43985">→ eUICC-based key management or custom HSM?</li>
+                            <li data-mc-element-id="44066">→ Who has control over transaction relaying?</li>
+                            <li data-mc-element-id="44148">→ Multisig requirements for high-value operations?</li>
+                            <li data-mc-element-id="44236">→ What levels of abstraction for ERC-4337?</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card" style="margin-bottom: 24px;" data-mc-element-id="44366">
+                        <h4 data-mc-element-id="44448"><i class="fas fa-comments" data-mc-element-id="44452"></i> Community Discussion</h4>
+                        <p style="color: #8B949E; font-size: 14px; margin-bottom: 16px;" data-mc-element-id="44534">These architectural decisions require community input. We're researching best practices from wallet developers and the broader Ethereum ecosystem.</p>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;" data-mc-element-id="44774">
+                            <a href="#" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;" data-mc-element-id="44859">
+                                <i class="fab fa-discord" data-mc-element-id="44974"></i> Join Discord Discussion
+                            </a>
+                            <a href="#" class="btn btn-tertiary" style="padding: 8px 16px; font-size: 13px;" data-mc-element-id="45090">
+                                <i class="fab fa-discourse" data-mc-element-id="45204"></i> Forum Thread
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="component-grid" data-mc-element-id="45362">
+                        <div class="component-card" data-mc-element-id="45415">
+                            <h4 data-mc-element-id="45472"><i class="fas fa-server" data-mc-element-id="45476"></i> Proposed Architecture</h4>
+                            <ul class="component-list" data-mc-element-id="45561">
+                                <li data-mc-element-id="45621">SMS gateway integration</li>
+                                <li data-mc-element-id="45686">Transaction intent parser</li>
+                                <li data-mc-element-id="45753">Mempool management</li>
+                                <li data-mc-element-id="45813">Gas price oracle</li>
+                                <li data-mc-element-id="45871">Relay to Ethereum node</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card" data-mc-element-id="45993">
+                            <h4 data-mc-element-id="46050"><i class="fas fa-shield-alt" data-mc-element-id="46054"></i> Security Considerations</h4>
+                            <ul class="component-list" data-mc-element-id="46145">
+                                <li data-mc-element-id="46205">End-to-end encryption</li>
+                                <li data-mc-element-id="46268">Rate limiting per user</li>
+                                <li data-mc-element-id="46332">Transaction validation</li>
+                                <li data-mc-element-id="46396">ERC-4337 account abstraction</li>
+                                <li data-mc-element-id="46466">Social recovery mechanisms</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="code-example" data-mc-element-id="46615">
+<span class="comment" data-mc-element-id="46642">// Middleware SMS Parser (Proposed)</span>
+<span class="keyword" data-mc-element-id="46707">async function</span> <span class="function" data-mc-element-id="46751">parseSMSIntent</span>(smsBody: <span class="keyword" data-mc-element-id="46805">string</span>) {
+  <span class="keyword" data-mc-element-id="46846">const</span> intent = <span class="function" data-mc-element-id="46890">parseTransaction</span>(smsBody);
+  <span class="keyword" data-mc-element-id="46949">const</span> validated = <span class="keyword" data-mc-element-id="46996">await</span> <span class="function" data-mc-element-id="47031">validateAddress</span>(intent.to);
+  <span class="keyword" data-mc-element-id="47091">const</span> gasEstimate = <span class="keyword" data-mc-element-id="47140">await</span> <span class="function" data-mc-element-id="47175">estimateGas</span>(intent);
+
+  <span class="keyword" data-mc-element-id="47231">return</span> {
+    to: validated.address,
+    value: intent.amount,
+    gasLimit: gasEstimate,
+    data: intent.calldata || <span class="string" data-mc-element-id="47378">"0x"</span>
+  };
+}
+                    </div>
+
+                    <a href="https://github.com/stk2chain/middleware" class="view-source-link" data-mc-element-id="47466">
+                        <i class="fab fa-github" data-mc-element-id="47566"></i>
+                        View source code (WIP)
+                    </a>
+                </div>
+
+                <!-- Chain Integration Tab -->
+                <div id="chain" class="tab-content" data-mc-element-id="47755">
+                    <div class="component-grid" data-mc-element-id="47812">
+                        <div class="component-card" data-mc-element-id="47865">
+                            <h4 data-mc-element-id="47922"><i class="fab fa-ethereum" data-mc-element-id="47926"></i> Node Requirements</h4>
+                            <ul class="component-list" data-mc-element-id="48009">
+                                <li data-mc-element-id="48069">Full or archive node access</li>
+                                <li data-mc-element-id="48138">WebSocket connection support</li>
+                                <li data-mc-element-id="48208">Mempool monitoring capabilities</li>
+                                <li data-mc-element-id="48281">Gas price API integration</li>
+                                <li data-mc-element-id="48348">Transaction status tracking</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card" data-mc-element-id="48475">
+                            <h4 data-mc-element-id="48532"><i class="fas fa-cogs" data-mc-element-id="48536"></i> Transaction Building</h4>
+                            <ul class="component-list" data-mc-element-id="48618">
+                                <li data-mc-element-id="48678">EIP-1559 transaction formatting</li>
+                                <li data-mc-element-id="48751">Dynamic gas pricing</li>
+                                <li data-mc-element-id="48812">Nonce management</li>
+                                <li data-mc-element-id="48870">Transaction serialization</li>
+                                <li data-mc-element-id="48937">Signature verification</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="component-card" style="margin-top: 24px;" data-mc-element-id="49082">
+                        <h4 data-mc-element-id="49161"><i class="fas fa-gas-pump" data-mc-element-id="49165"></i> Gas Optimization Strategies</h4>
+                        <ul class="component-list" data-mc-element-id="49254">
+                            <li data-mc-element-id="49310">Batch transaction processing</li>
+                            <li data-mc-element-id="49376">ERC-4337 gasless transactions</li>
+                            <li data-mc-element-id="49443">Priority fee optimization</li>
+                            <li data-mc-element-id="49506">Network congestion monitoring</li>
+                            <li data-mc-element-id="49573">Fallback to L2 solutions</li>
+                        </ul>
+                    </div>
+
+                    <div class="code-example" data-mc-element-id="49685">
+<span class="comment" data-mc-element-id="49712">// Transaction Relay to Ethereum</span>
+<span class="keyword" data-mc-element-id="49774">async function</span> <span class="function" data-mc-element-id="49818">relayTransaction</span>(signedTx: <span class="keyword" data-mc-element-id="49875">string</span>) {
+  <span class="keyword" data-mc-element-id="49916">const</span> provider = <span class="keyword" data-mc-element-id="49962">new</span> ethers.JsonRpcProvider(RPC_URL);
+  <span class="keyword" data-mc-element-id="50030">const</span> tx = <span class="keyword" data-mc-element-id="50070">await</span> provider.sendTransaction(signedTx);
+
+  <span class="comment" data-mc-element-id="50146">// Monitor confirmation</span>
+  <span class="keyword" data-mc-element-id="50201">const</span> receipt = <span class="keyword" data-mc-element-id="50246">await</span> tx.wait(1);
+
+  <span class="comment" data-mc-element-id="50298">// Send SMS notification</span>
+  <span class="keyword" data-mc-element-id="50354">await</span> <span class="function" data-mc-element-id="50389">sendSMSNotification</span>({
+    to: userPhone,
+    message: <span class="string" data-mc-element-id="50473">`TX Confirmed! Hash: ${tx.hash.slice(0,10)}...`</span>
+  });
+
+  <span class="keyword" data-mc-element-id="50560">return</span> receipt;
+}
+                    </div>
+
+                    <div class="component-card" style="margin-top: 24px;" data-mc-element-id="50655">
+                        <h4 data-mc-element-id="50734"><i class="fas fa-vial" data-mc-element-id="50738"></i> Testnet Deployment Guide</h4>
+                        <p style="color: #8B949E; font-size: 14px; margin-bottom: 12px;" data-mc-element-id="50820">Deploy to Sepolia or Goerli for testing:</p>
+                        <div class="code-example" style="margin-top: 12px;" data-mc-element-id="50954">
+<span class="comment" data-mc-element-id="51007"># Deploy middleware</span>
+<span class="command" data-mc-element-id="51056">npm run</span> deploy:testnet
+
+<span class="comment" data-mc-element-id="51109"># Configure SMS gateway</span>
+<span class="command" data-mc-element-id="51162">export</span> TWILIO_ACCOUNT_SID=<span class="string" data-mc-element-id="51217">"..."</span>
+<span class="command" data-mc-element-id="51251">export</span> TWILIO_AUTH_TOKEN=<span class="string" data-mc-element-id="51305">"..."</span>
+
+<span class="comment" data-mc-element-id="51340"># Start relay service</span>
+<span class="command" data-mc-element-id="51391">npm run</span> start:relay
+                        </div>
+                    </div>
+
+                    <a href="https://github.com/stk2chain/chain-integration" class="view-source-link" data-mc-element-id="51519">
+                        <i class="fab fa-github" data-mc-element-id="51626"></i>
+                        View source code
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section class="roadmap-section" data-mc-element-id="51820">
+        <div class="container" data-mc-element-id="51862">
+            <div class="section-header" data-mc-element-id="51898">
+                <div class="section-label" data-mc-element-id="51943">[ ROADMAP ]</div>
+                <h2 class="section-title" data-mc-element-id="52004">Functionally Testable in 6 Months</h2>
+                <p class="section-desc" data-mc-element-id="52085">Budget: $30,000 USD</p>
+            </div>
+
+            <div class="timeline" data-mc-element-id="52165">
+                <div class="timeline-item" data-mc-element-id="52204">
+                    <div class="timeline-dot" data-mc-element-id="52252"></div>
+                    <div class="timeline-content" data-mc-element-id="52305">
+                        <div class="timeline-phase" data-mc-element-id="52360">Phase 1 - Month 1</div>
+                        <div class="timeline-title" data-mc-element-id="52436">Research and Design</div>
+                        <div class="timeline-desc" data-mc-element-id="52514">Finalize protocol design and architecture through stakeholder interviews and community engagement</div>
+                        <div class="timeline-budget" data-mc-element-id="52669">Budget: $5,000</div>
+                        <div class="timeline-deliverables" data-mc-element-id="52743">
+                            <div class="deliverable-item" data-mc-element-id="52807">
+                                <i class="fas fa-check-circle" data-mc-element-id="52870"></i>
+                                <span data-mc-element-id="52938">Middleware security specifications (ERC-4337 integration)</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="53072">
+                                <i class="fas fa-check-circle" data-mc-element-id="53135"></i>
+                                <span data-mc-element-id="53203">eUICC security framework for hardware wallet functionality</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="53338">
+                                <i class="fas fa-check-circle" data-mc-element-id="53401"></i>
+                                <span data-mc-element-id="53469">Java Card applet security audit</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="53577">
+                                <i class="fas fa-check-circle" data-mc-element-id="53640"></i>
+                                <span data-mc-element-id="53708">STK interface prototypes and user flows</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="timeline-empty" data-mc-element-id="53874"></div>
+                </div>
+
+                <div class="timeline-item" data-mc-element-id="53949">
+                    <div class="timeline-dot" data-mc-element-id="53997"></div>
+                    <div class="timeline-empty" data-mc-element-id="54050"></div>
+                    <div class="timeline-content" data-mc-element-id="54105">
+                        <div class="timeline-phase" data-mc-element-id="54160">Phase 2 - Months 2-4</div>
+                        <div class="timeline-title" data-mc-element-id="54239">Development and Testing</div>
+                        <div class="timeline-desc" data-mc-element-id="54321">Build and test eSIM profile, STK menu, and middleware components with blockchain testnets</div>
+                        <div class="timeline-budget" data-mc-element-id="54468">Budget: $15,000</div>
+                        <div class="timeline-deliverables" data-mc-element-id="54543">
+                            <div class="deliverable-item" data-mc-element-id="54607">
+                                <i class="fas fa-check-circle" data-mc-element-id="54670"></i>
+                                <span data-mc-element-id="54738">Functional middleware with transaction relay</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="54859">
+                                <i class="fas fa-check-circle" data-mc-element-id="54922"></i>
+                                <span data-mc-element-id="54990">eSIM profile with STK menu implementation</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="55108">
+                                <i class="fas fa-check-circle" data-mc-element-id="55171"></i>
+                                <span data-mc-element-id="55239">Comprehensive test reports (latency, bandwidth, security)</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="55373">
+                                <i class="fas fa-check-circle" data-mc-element-id="55436"></i>
+                                <span data-mc-element-id="55504">100% unit test coverage for core modules</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="timeline-item" data-mc-element-id="55691">
+                    <div class="timeline-dot" data-mc-element-id="55739"></div>
+                    <div class="timeline-content" data-mc-element-id="55792">
+                        <div class="timeline-phase" data-mc-element-id="55847">Phase 3 - Months 5-6</div>
+                        <div class="timeline-title" data-mc-element-id="55926">Deployment and Feedback</div>
+                        <div class="timeline-desc" data-mc-element-id="56008">Pilot deployment and user testing in target regions with real-world validation</div>
+                        <div class="timeline-budget" data-mc-element-id="56144">Budget: $10,000</div>
+                        <div class="timeline-deliverables" data-mc-element-id="56219">
+                            <div class="deliverable-item" data-mc-element-id="56283">
+                                <i class="fas fa-check-circle" data-mc-element-id="56346"></i>
+                                <span data-mc-element-id="56414">Live pilot program in emerging market region</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="56535">
+                                <i class="fas fa-check-circle" data-mc-element-id="56598"></i>
+                                <span data-mc-element-id="56666">User feedback analysis and system refinement</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="56787">
+                                <i class="fas fa-check-circle" data-mc-element-id="56850"></i>
+                                <span data-mc-element-id="56918">Production-ready protocol documentation</span>
+                            </div>
+                            <div class="deliverable-item" data-mc-element-id="57034">
+                                <i class="fas fa-check-circle" data-mc-element-id="57097"></i>
+                                <span data-mc-element-id="57165">Performance metrics: &lt;30s latency, 99% uptime</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="timeline-empty" data-mc-element-id="57340"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bounty Board -->
+    <section class="bounty-section" id="bounties" data-mc-element-id="57478">
+        <div class="container" data-mc-element-id="57533">
+            <div class="section-header" data-mc-element-id="57569">
+                <div class="section-label" data-mc-element-id="57614">[ BOUNTIES ]</div>
+                <h2 class="section-title" data-mc-element-id="57676">Active Community Bounties</h2>
+                <p class="section-desc" data-mc-element-id="57749">Code is our only currency. Claim a bounty, submit a PR, get paid.</p>
+            </div>
+
+            <div class="bounty-grid" data-mc-element-id="57875">
+                <div class="bounty-card" data-mc-element-id="57917">
+                    <div class="bounty-header" data-mc-element-id="57963">
+                        <div data-mc-element-id="58015">
+                            <div class="bounty-title" data-mc-element-id="58049">Middleware SMS Parser</div>
+                        </div>
+                        <div class="bounty-amount" data-mc-element-id="58158">$2,500</div>
+                    </div>
+                    <div class="bounty-desc" data-mc-element-id="58245">
+                        Build the core SMS → transaction intent parser with encryption support. Must handle USSD codes, validate addresses, and parse amounts.
+                    </div>
+                    <div class="bounty-tags" data-mc-element-id="58477">
+                        <span class="bounty-tag" data-mc-element-id="58527">Rust</span>
+                        <span class="bounty-tag" data-mc-element-id="58588">Cryptography</span>
+                        <span class="bounty-tag" data-mc-element-id="58657">Phase 2</span>
+                    </div>
+                    <div class="bounty-footer" data-mc-element-id="58744">
+                        <div class="bounty-status" data-mc-element-id="58796">
+                            <i class="fas fa-circle" data-mc-element-id="58852"></i>
+                            <span data-mc-element-id="58910">Closed</span>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;" data-mc-element-id="58983">
+                            Claim Bounty
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bounty-card" data-mc-element-id="59204">
+                    <div class="bounty-header" data-mc-element-id="59250">
+                        <div data-mc-element-id="59302">
+                            <div class="bounty-title" data-mc-element-id="59336">Java Card STK Applet</div>
+                        </div>
+                        <div class="bounty-amount" data-mc-element-id="59444">$3,000</div>
+                    </div>
+                    <div class="bounty-desc" data-mc-element-id="59531">
+                        Develop the SIM Toolkit menu interface with wallet operations (send, receive, balance, swap). Must work on Java Card 3.0.4+.
+                    </div>
+                    <div class="bounty-tags" data-mc-element-id="59753">
+                        <span class="bounty-tag" data-mc-element-id="59803">Java Card</span>
+                        <span class="bounty-tag" data-mc-element-id="59869">STK</span>
+                        <span class="bounty-tag" data-mc-element-id="59929">Phase 2</span>
+                    </div>
+                    <div class="bounty-footer" data-mc-element-id="60016">
+                        <div class="bounty-status" data-mc-element-id="60068">
+                            <i class="fas fa-circle" data-mc-element-id="60124"></i>
+                            <span data-mc-element-id="60182">Closed</span>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;" data-mc-element-id="60255">
+                            Claim Bounty
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bounty-card" data-mc-element-id="60476">
+                    <div class="bounty-header" data-mc-element-id="60522">
+                        <div data-mc-element-id="60574">
+                            <div class="bounty-title" data-mc-element-id="60608">ERC-4337 Account Abstraction</div>
+                        </div>
+                        <div class="bounty-amount" data-mc-element-id="60724">$2,000</div>
+                    </div>
+                    <div class="bounty-desc" data-mc-element-id="60811">
+                        Integrate ERC-4337 for gasless transactions and social recovery. Research best practices from wallet dev community.
+                    </div>
+                    <div class="bounty-tags" data-mc-element-id="61024">
+                        <span class="bounty-tag" data-mc-element-id="61074">Solidity</span>
+                        <span class="bounty-tag" data-mc-element-id="61139">ERC-4337</span>
+                        <span class="bounty-tag" data-mc-element-id="61204">Phase 1</span>
+                    </div>
+                    <div class="bounty-footer" data-mc-element-id="61291">
+                        <div class="bounty-status" data-mc-element-id="61343">
+                            <i class="fas fa-circle" data-mc-element-id="61399"></i>
+                            <span data-mc-element-id="61457">Closed</span>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;" data-mc-element-id="61530">
+                            Claim Bounty
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bounty-card" data-mc-element-id="61751">
+                    <div class="bounty-header" data-mc-element-id="61797">
+                        <div data-mc-element-id="61849">
+                            <div class="bounty-title" data-mc-element-id="61883">E2E Latency Testing Suite</div>
+                        </div>
+                        <div class="bounty-amount" data-mc-element-id="61996">$1,500</div>
+                    </div>
+                    <div class="bounty-desc" data-mc-element-id="62083">
+                        Create comprehensive testing suite measuring SMS → chain confirmation latency, bandwidth usage, and reliability across different networks.
+                    </div>
+                    <div class="bounty-tags" data-mc-element-id="62319">
+                        <span class="bounty-tag" data-mc-element-id="62369">TypeScript</span>
+                        <span class="bounty-tag" data-mc-element-id="62436">Testing</span>
+                        <span class="bounty-tag" data-mc-element-id="62500">Phase 2</span>
+                    </div>
+                    <div class="bounty-footer" data-mc-element-id="62587">
+                        <div class="bounty-status" data-mc-element-id="62639">
+                            <i class="fas fa-circle" data-mc-element-id="62695"></i>
+                            <span data-mc-element-id="62753">Closed</span>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;" data-mc-element-id="62826">
+                            Claim Bounty
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section class="community-section" id="community" data-mc-element-id="63115">
+        <div class="container" data-mc-element-id="63174">
+            <div class="section-header" data-mc-element-id="63210">
+                <div class="section-label" data-mc-element-id="63255">[ COMMUNITY ]</div>
+                <h2 class="section-title" data-mc-element-id="63318">Core Principles</h2>
+                <p class="section-desc" data-mc-element-id="63381">The community is my co-founder and code is my only currency</p>
+            </div>
+
+            <div class="principles-grid" data-mc-element-id="63501">
+                <div class="principle-card" data-mc-element-id="63547">
+                    <div class="principle-number" data-mc-element-id="63596">1</div>
+                    <div class="principle-title" data-mc-element-id="63654">Functionality &gt; Form</div>
+                    <div class="principle-desc" data-mc-element-id="63730">Ship working code first, refine later. No opinions, only code. Every contribution must be testable, mergeable, and functional.</div>
+                </div>
+
+                <div class="principle-card" data-mc-element-id="63931">
+                    <div class="principle-number" data-mc-element-id="63980">2</div>
+                    <div class="principle-title" data-mc-element-id="64038">Community as Compiler</div>
+                    <div class="principle-desc" data-mc-element-id="64115">Use real-time feedback to iterate. Peer review is mandatory. 2+ community devs review every PR. No payouts for unfinished work.</div>
+                </div>
+
+                <div class="principle-card" data-mc-element-id="64317">
+                    <div class="principle-number" data-mc-element-id="64366">3</div>
+                    <div class="principle-title" data-mc-element-id="64424">Decentralized Critical Mass</div>
+                    <div class="principle-desc" data-mc-element-id="64507">Grow via "popup village" sprints (IRL + virtual). 72-hour focused development sessions to ship features and onboard contributors.</div>
+                </div>
+
+                <div class="principle-card" data-mc-element-id="64711">
+                    <div class="principle-number" data-mc-element-id="64760">4</div>
+                    <div class="principle-title" data-mc-element-id="64818">Kill Metrics</div>
+                    <div class="principle-desc" data-mc-element-id="64886">If it can't be measured, it doesn't exist. Track contributor growth, bounties paid, latency, uptime, test coverage, and merge frequency.</div>
+                </div>
+            </div>
+
+            <div class="community-cta" data-mc-element-id="65112">
+                <h3 data-mc-element-id="65156">Ready to Contribute?</h3>
+                <p data-mc-element-id="65202">Join the movement to bring blockchain to billions. Code, bounties, and community await.</p>
+                <div class="cta-group" style="justify-content: center;" data-mc-element-id="65313">
+                    <button class="btn btn-primary" data-mc-element-id="65390">
+                        <i class="fab fa-discord" data-mc-element-id="65447"></i>
+                        Join Discord
+                    </button>
+                    <button class="btn btn-secondary" data-mc-element-id="65565">
+                        <i class="fab fa-github" data-mc-element-id="65624"></i>
+                        View GitHub
+                    </button>
+                    <button class="btn btn-tertiary" data-mc-element-id="65740">
+                        <i class="fas fa-book-open" data-mc-element-id="65798"></i>
+                        Read Docs
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer data-mc-element-id="65992">
+        <div class="container" data-mc-element-id="66009">
+            <div class="footer-content" data-mc-element-id="66045">
+                <div class="footer-brand" data-mc-element-id="66090">
+                    <h3 data-mc-element-id="66137">STK2Chain</h3>
+                    <p data-mc-element-id="66176">Open-source protocol bridging GSM technology with blockchain systems to enable seamless transactions, wallet management, and smart contract interactions without requiring an internet connection.</p>
+                    <div class="social-links" data-mc-element-id="66398">
+                        <a href="#" class="social-link" data-mc-element-id="66449">
+                            <i class="fab fa-github" data-mc-element-id="66510"></i>
+                        </a>
+                        <a href="#" class="social-link" data-mc-element-id="66593">
+                            <i class="fab fa-discord" data-mc-element-id="66654"></i>
+                        </a>
+                        <a href="#" class="social-link" data-mc-element-id="66738">
+                            <i class="fab fa-twitter" data-mc-element-id="66799"></i>
+                        </a>
+                        <a href="#" class="social-link" data-mc-element-id="66883">
+                            <i class="fab fa-telegram" data-mc-element-id="66944"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="footer-column" data-mc-element-id="67072">
+                    <h4 data-mc-element-id="67120">Documentation</h4>
+                    <ul class="footer-links" data-mc-element-id="67163">
+                        <li data-mc-element-id="67213"><a href="#" data-mc-element-id="67217">Getting Started</a></li>
+                        <li data-mc-element-id="67278"><a href="#" data-mc-element-id="67282">Architecture</a></li>
+                        <li data-mc-element-id="67340"><a href="#" data-mc-element-id="67344">API Reference</a></li>
+                        <li data-mc-element-id="67403"><a href="#" data-mc-element-id="67407">Security</a></li>
+                        <li data-mc-element-id="67461"><a href="#" data-mc-element-id="67465">Contributing</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-column" data-mc-element-id="67565">
+                    <h4 data-mc-element-id="67613">Community</h4>
+                    <ul class="footer-links" data-mc-element-id="67652">
+                        <li data-mc-element-id="67702"><a href="#" data-mc-element-id="67706">Discord Server</a></li>
+                        <li data-mc-element-id="67766"><a href="#" data-mc-element-id="67770">GitHub Discussions</a></li>
+                        <li data-mc-element-id="67834"><a href="#" data-mc-element-id="67838">Bounty Board</a></li>
+                        <li data-mc-element-id="67896"><a href="#" data-mc-element-id="67900">Popup Villages</a></li>
+                        <li data-mc-element-id="67960"><a href="#" data-mc-element-id="67964">Code of Conduct</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-column" data-mc-element-id="68067">
+                    <h4 data-mc-element-id="68115">Resources</h4>
+                    <ul class="footer-links" data-mc-element-id="68154">
+                        <li data-mc-element-id="68204"><a href="#" data-mc-element-id="68208">Whitepaper</a></li>
+                        <li data-mc-element-id="68264"><a href="#" data-mc-element-id="68268">Roadmap</a></li>
+                        <li data-mc-element-id="68321"><a href="#" data-mc-element-id="68325">Brand Assets</a></li>
+                        <li data-mc-element-id="68383"><a href="#" data-mc-element-id="68387">Research</a></li>
+                        <li data-mc-element-id="68441"><a href="#" data-mc-element-id="68445">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom" data-mc-element-id="68555">
+                <p data-mc-element-id="68599">© 2024 STK2Chain. Open source under <a href="#" data-mc-element-id="68638">MIT License</a>. Built with ❤️ by the community.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block').querySelector('.code-content');
+            const text = codeBlock.innerText;
+
+            navigator.clipboard.writeText(text).then(() => {
+                button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function openTab(evt, tabName) {
+            // Hide all tab content
+            const tabContent = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContent.length; i++) {
+                tabContent[i].classList.remove('active');
+            }
+
+            // Remove active class from all buttons
+            const tabButtons = document.getElementsByClassName('tab-button');
+            for (let i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove('active');
+            }
+
+            // Show selected tab and mark button as active
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        // Add smooth hover effect to architecture layers
+        document.querySelectorAll('.layer').forEach(layer => {
+            layer.addEventListener('mouseenter', function() {
+                this.style.backgroundColor = '#161B22';
+            });
+            layer.addEventListener('mouseleave', function() {
+                this.style.backgroundColor = '#0D1117';
+            });
+        });
+    </script>
+
+<script>__MC_SITE_ID__ = "db457063e2826462f23e5c6133f286875913b393e0f7428b96745e90e4948d25"</script><script>__MC_OPTIONS__ = {
+  "svg": false,
+  "overlay": false
+}</script><script src="https://forge.moonchild.ai/public/devigner.global.js" type="module"></script></body></html>
