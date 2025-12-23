@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "permit2/src/Permit2.sol";
+import "permit2/src/SignatureTransfer.sol";
 import {SignatureVerification} from "permit2/src/libraries/SignatureVerification.sol";
 
 /**
  * @title Permit2WithOperatorOnlyERC1271
  * @notice Minimal extension that only adds operator ERC-1271 support
  */
-contract Permit2WithOperatorOnlyERC1271 is Permit2 {
+contract Permit2WithOperatorOnlyERC1271 is SignatureTransfer {
     address public immutable OPERATOR;
     bytes4 private constant MAGIC_VALUE = 0x1626ba7e;
     using SignatureVerification for bytes;
