@@ -66,7 +66,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 
 1. **Install SpacetimeDB CLI**
    ```bash
-   curl -sSf https://spacetime.dev/install.sh | sh
+   curl -sSf https://install.spacetimedb.com | sh
    ```
 
 2. **Start SpacetimeDB**
