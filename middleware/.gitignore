@@ -1,0 +1,23 @@
+# ===== rust / cargo =====
+# build artifacts
+/target/
+/debug/
+/release/
+
+# lockfiles (if you intentionally commit per-crate Cargo.lock remove this)
+Cargo.lock
+
+# rustfmt backups
+**/*.rs.bk
+
+# MSVC debug files
+*.pdb
+
+# ===== spacetimedb / module artifacts =====
+/.spacetime
+
+# ===== local development =====
+.env
+.env.*
+.vscode/
+.idea/
