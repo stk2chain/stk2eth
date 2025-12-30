@@ -82,9 +82,9 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
    cd stk2eth
    ```
 
-2. **Build and deploy `ussdgeth` module on SpacetimeDB**
+2. **Build and deploy `middleware` module on SpacetimeDB**
    ```bash
-   spacetime publish -c --server local --project-path ussdgeth gateway2
+   spacetime publish -c --server local --project-path middleware gateway2
    ```
    (You may replace `gateway2` with any valid URL-safe name.)
 3. **Start USSD client**
@@ -127,7 +127,7 @@ Users in areas with **limited internet infrastracture *(No internet)*** need sec
 
 | Component | Purpose | Technology | Status |
 |-----------|---------|------------|--------|                                       
-| [**ussdgeth**](../ussdgeth/README.md) | Manages USSD sessions, stores state, and processes transactions | Rust/WASM/SpacetimeDB | ✅ Active |
+| [**middleware**](../middleware/README.md) | Manages USSD sessions, stores state, and processes transactions | Rust/WASM/SpacetimeDB | ✅ Active |
 | [**ussdclient**](../ussdclient/README.md) | Connects USSD gateways to SpacetimeDB and relays response via HTTP/Websocket | Rust/Axum | ✅ Active |
 | [**ethclient**](../ethclient/README.md) | Sends and manages On Chain transactions | Rust | ✅ Active |
 | [**smsclient**](../ethclient/README.md) | Sends transaction notifications via SMS | Rust/WASM | 🚧 In Development |
