@@ -31,7 +31,7 @@ eip712_hash = lambda domain_sep, struct: keccak(b'\x19\x01' + domain_sep + struc
 # Main function
 def permit_transfer_from(token, amount, spender, nonce, deadline, domain_sep):
     """Generate EIP-712 hash for Permit2 permitTransferFrom."""
-    return to_hex(eip712_hash(
+    return eip712_hash(
         domain_sep,
         hash_struct(token, amount, spender, nonce, deadline)
-    ))
+    )

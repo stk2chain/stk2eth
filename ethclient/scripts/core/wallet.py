@@ -1,6 +1,7 @@
 import os
 
 from eth_utils import to_bytes
+from eth_keys import keys
 from scripts.core.auth_7702 import _hash_auth7702Message, _auth_sig, SignedAuthorization
 
 from scripts.core.utils import phone_to_salt
@@ -8,7 +9,25 @@ from scripts.core.utils import phone_to_salt
 from typing import Optional, Tuple
 import hashlib
 
+
+
 PERMIT2_ADDRESS = os.getenv("PERMIT2_7702_ADDRESS", "0x000000000022D473030F116dDEE9F6B43aC78BA3")
+
+# secp256k1 curve order
+SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+SECP256K1_N_HALF = SECP256K1_N // 2
+
+
+def _ensure_low_s(s: int, v: int) -> Tuple[int, int]:
+    """
+    Ensure s value is in the lower half of the curve order.
+    If s > n/2, convert to n - s and flip v between 27/28.
+    """
+    if s > SECP256K1_N_HALF:
+        s = SECP256K1_N - s
+        # Flip v between 27 and 28
+        v = 27 if v == 28 else 28
+    return s, v
 
 
 def _nick_auth_7702(r: int, s: int, v: int, msg_hash: bytes) -> Tuple[str, int]:
@@ -18,7 +37,8 @@ def _nick_auth_7702(r: int, s: int, v: int, msg_hash: bytes) -> Tuple[str, int]:
         try:
             attempts += 1
             auth_sig = _auth_sig(r, s, v)
-            pubk = auth_sig.recover_public_key_from_msg(msg_hash)
+            pubk = keys.ecdsa_recover(msg_hash, auth_sig)
+            # auth_sig.recover_public_key_from_msg(msg_hash)
             authority_address = pubk.to_checksum_address()
             break
         except Exception:
@@ -41,6 +61,9 @@ def create_phone_permit2_authorization(phone_number: str, chain_id: int, nonce: 
     s = int.from_bytes(phone_salt, byteorder='big')
     v = 27
     
+    # Ensure s is in the lower half of the curve order
+    s, v = _ensure_low_s(s, v)
+    
     (authority_address, r) = _nick_auth_7702(r, s, v, msg_hash)
     
     signed_auth = SignedAuthorization(
@@ -52,7 +75,7 @@ def create_phone_permit2_authorization(phone_number: str, chain_id: int, nonce: 
         s=s
     )   
 
-    return (authority_address, signed_auth, phone_salt)
+    return (authority_address, signed_auth, msg_hash)
 
 
 def create_phone_burner_wallet(phone_number: str, nonce: int):
