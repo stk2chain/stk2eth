@@ -1,7 +1,7 @@
 use spacetimedb::{table, Timestamp};
 use super::types::{TxStatus, TxType};
 
-#[table(name = eth_tx)]
+#[table(name = eth_tx, public)]
 pub struct EthTx {
     #[primary_key]
     #[unique]

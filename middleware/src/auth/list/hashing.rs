@@ -35,6 +35,22 @@ pub struct SignedAuthorization {
     pub s: [u8; 32],
 }
 
+// secp256k1 curve order
+const SECP256K1_N: [u8; 32] = [
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE,
+    0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B,
+    0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41,
+];
+
+// secp256k1n / 2
+const SECP256K1_N_HALF: [u8; 32] = [
+    0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0x5D, 0x57, 0x6E, 0x73, 0x57, 0xA4, 0x50, 0x1D,
+    0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0,
+];
+
 fn normalize_phone_number(phone: &str) -> String {
     phone.chars().filter(|c| c.is_ascii_digit()).collect()
 }
@@ -75,6 +91,50 @@ fn hash_auth7702_message(chain_id: u64, delegate_to: &str, nonce: u64) -> [u8; 3
     hasher.finalize().into()
 }
 
+// Compare two 32-byte arrays as big-endian integers
+// Returns true if a < b
+fn is_less_than(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    for i in 0..32 {
+        if a[i] < b[i] {
+            return true;
+        } else if a[i] > b[i] {
+            return false;
+        }
+    }
+    false // equal
+}
+
+// Normalize s value to be in the lower half (s < secp256k1n/2)
+// If s > secp256k1n/2, return (n - s) and flip v
+fn normalize_s(s: [u8; 32], v: u8) -> ([u8; 32], u8) {
+    if is_less_than(&s, &SECP256K1_N_HALF) || s == SECP256K1_N_HALF {
+        // s is already in lower half
+        return (s, v);
+    }
+    
+    log::info!("S value too high, normalizing by computing (n - s)");
+    
+    // Compute n - s
+    let mut result = [0u8; 32];
+    let mut borrow = 0i16;
+    
+    for i in (0..32).rev() {
+        let diff = SECP256K1_N[i] as i16 - s[i] as i16 - borrow;
+        if diff < 0 {
+            result[i] = (diff + 256) as u8;
+            borrow = 1;
+        } else {
+            result[i] = diff as u8;
+            borrow = 0;
+        }
+    }
+    
+    // Flip v (27 <-> 28 or 0 <-> 1)
+    let new_v = if v == 27 { 28 } else if v == 28 { 27 } else if v == 0 { 1 } else { 0 };
+    
+    (result, new_v)
+}
+
 fn recover_address(r: &[u8; 32], s: &[u8; 32], v: u8, msg_hash: &[u8; 32]) -> Option<[u8; 20]> {
     // Construct signature from r and s
     let mut sig_bytes = [0u8; 64];
@@ -82,7 +142,7 @@ fn recover_address(r: &[u8; 32], s: &[u8; 32], v: u8, msg_hash: &[u8; 32]) -> Op
     sig_bytes[32..].copy_from_slice(s);
     
     let signature = Signature::from_slice(&sig_bytes).ok()?;
-    let recovery_id = RecoveryId::from_byte(v - 27)?;
+    let recovery_id = RecoveryId::from_byte(v.checked_sub(27)?)?;
     
     // Recover public key
     let recovered_key = VerifyingKey::recover_from_prehash(msg_hash, &signature, recovery_id).ok()?;
@@ -102,16 +162,17 @@ fn recover_address(r: &[u8; 32], s: &[u8; 32], v: u8, msg_hash: &[u8; 32]) -> Op
     Some(address)
 }
 
-fn nick_auth_7702(mut r: [u8; 32], s: [u8; 32], v: u8, msg_hash: &[u8; 32]) -> ([u8; 20], [u8; 32]) {
+fn nick_auth_7702(mut r: [u8; 32], s: [u8; 32], v: u8, msg_hash: &[u8; 32]) -> ([u8; 20], [u8; 32], u8) {
     log::info!("Searching for valid signature with phone-derived salt...");
     let mut attempts = 0u64;
+    let mut current_v = v;
     
     loop {
         attempts += 1;
         
-        if let Some(address) = recover_address(&r, &s, v, msg_hash) {
+        if let Some(address) = recover_address(&r, &s, current_v, msg_hash) {
             log::info!("✓ Found valid signature after {} attempts", attempts);
-            return (address, r);
+            return (address, r, current_v);
         }
         
         let mut carry = 1u16;
@@ -144,10 +205,13 @@ pub fn create_phone_permit2_authorization(
     
     let mut r = [0u8; 32];
     r.copy_from_slice(&msg_hash);
-    let s = phone_salt;
-    let v = 27;
     
-    let (authority_address, final_r) = nick_auth_7702(r, s, v, &msg_hash);
+    // Normalize s to ensure it's in the lower half
+    let (s, v) = normalize_s(phone_salt, 27);
+    
+    log::info!("Using normalized s value (low-s form)");
+    
+    let (authority_address, final_r, final_v) = nick_auth_7702(r, s, v, &msg_hash);
     
     let mut addr_bytes = [0u8; 20];
     let delegate_bytes = hex::decode(&delegate_address[2..]).expect("Invalid address");
@@ -157,7 +221,7 @@ pub fn create_phone_permit2_authorization(
         chain_id,
         address: addr_bytes,
         nonce,
-        v,
+        v: final_v,
         r: final_r,
         s,
     };

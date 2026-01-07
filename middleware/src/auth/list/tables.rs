@@ -2,10 +2,11 @@ use spacetimedb::{table, Timestamp};
 use super::types::AuthStatus;
 
 
-#[table(name = auth_7702)]
+#[table(name = auth_7702, public)]
 pub struct Auth7702 {
     #[primary_key]
     #[unique]
+    #[index(btree)]
     pub authority_address: String,
 
     pub chain_id: u64,

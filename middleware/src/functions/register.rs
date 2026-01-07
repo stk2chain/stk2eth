@@ -1,6 +1,7 @@
 use crate::functions::{validate_pin_format, hash_pin, parse_input};
-use crate::auth::wallet::{esim_profile, EsimProfile};
+use crate::auth::list::{hashing::create_phone_permit2_authorization, auth_7702, Auth7702, AuthStatus};
 use crate::auth::pin::{user_pin, UserPIN};
+use crate::auth::wallet::{esim_profile, EsimProfile};
 use crate::ussd::session::USSDSession;
 use spacetimedb::Table;    
 use spacetimedb::ReducerContext;
@@ -57,11 +58,34 @@ pub fn confirm_register_pin(ctx: &ReducerContext, mut session: USSDSession) -> R
 
     // TODO: Only  insert esim_profile if phone_number is not already registered
     if !ctx.db.esim_profile().phone_number().find(&session.phone_number).is_some() {
+        let (wallet_, _auth) = create_phone_permit2_authorization(
+            &session.phone_number,
+            0, //Universal Chain ID
+            0,
+            None,
+            None,
+        );
+        
+        let wallet_address = hex::encode(wallet_);
+        
         //Register Esim Profile and user PIN
         ctx.db.esim_profile().insert(EsimProfile {
             phone_number: session.phone_number.clone(),
-            wallet_address: "".to_string(),
+            wallet_address: wallet_address.clone(),
             // auth_hash: Some(pin_hash),
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        });
+
+        ctx.db.auth_7702().insert(Auth7702 {
+            authority_address: wallet_address.clone(),
+            chain_id: _auth.chain_id,
+            delegate_to: hex::encode(_auth.address),
+            nonce: _auth.nonce,
+            v: _auth.v,
+            r: hex::encode(_auth.r),
+            s: hex::encode(_auth.s),
+            status: AuthStatus::Pending,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
         });
