@@ -391,7 +391,7 @@ pub fn process_ussd_step(
     if let Some(_code) = ctx.db.ussd_code().service_code().find(service_code.clone()) {
         //Does phone number EsimProfile exist in DB?
 
-        let _profile = _check_profile_exists(ctx, phone_number.clone());
+        let _profile = _check_profile_exists(ctx, normalize_phone_number(&phone_number.clone()));
 
         let _session = _check_session_exists(ctx, session_id.clone());
 
@@ -401,7 +401,7 @@ pub fn process_ussd_step(
         let mut current_session = session_update_or_create(
             ctx,
             session_id.clone(),
-            phone_number,
+            normalize_phone_number(&phone_number),
             network_code,
             service_code,
             text.clone(),

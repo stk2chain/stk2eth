@@ -6,7 +6,7 @@ use std::env;
 
 fn get_permit2_address() -> String {
     env::var("PERMIT2_7702_ADDRESS")
-        .unwrap_or_else(|_| "0x000000000022D473030F116dDEE9F6B43aC78BA3".to_string())
+        .unwrap_or_else(|_| "0x2fDdd08Fb3e796bc68B1a26f3D1a61b073860fEf".to_string())
 }
 
 #[derive(Clone)]
@@ -51,7 +51,7 @@ const SECP256K1_N_HALF: [u8; 32] = [
     0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0,
 ];
 
-fn normalize_phone_number(phone: &str) -> String {
+pub fn normalize_phone_number(phone: &str) -> String {
     phone.chars().filter(|c| c.is_ascii_digit()).collect()
 }
 

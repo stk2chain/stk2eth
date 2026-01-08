@@ -52,17 +52,17 @@
 				"SwapOption": {
 					"option": "2",
 					"display_name": "Swap",
-					"next_screen": "SwapScreen"
+					"next_screen": "SwapTokenScreen"
 				},
 				"WithdrawOption": {
 					"option": "3",
 					"display_name": "Withdraw",
-					"next_screen": "WithdrawScreen"
+					"next_screen": "WithdrawAmountScreen"
 				},
 				"BalanceOption": {
 					"option": "4",
 					"display_name": "Balance",
-					"next_screen": "BalanceScreen"
+					"next_screen": "BalancePinScreen"
 				},
 				"AccountOption": {
 					"option": "5",
@@ -78,19 +78,19 @@
 		},
 
         "ToNumberScreen": {
-			"text": "Enter Phone No.",
+			"text": "Enter Phone No.:",
 			"screen_type": "Function",
 			"function": "validate_phone_number",
 			"default_next_screen": "ToAmountScreen"
 		},
 		"ToAmountScreen": {
-			"text": "Amount",
+			"text": "Amount:",
 			"screen_type": "Function",
 			"function": "validate_amount",
 			"default_next_screen": "PINScreen"
 		},
         "PINScreen": {
-			"text": "PIN",
+			"text": "PIN:",
 			"screen_type": "Function",
 			"function": "validate_pin",
 			"default_next_screen": "CancelTXScreen"
@@ -110,6 +110,70 @@
 			"text": "Transaction Failed",
 			"screen_type": "Quit",
 			"default_next_screen": "MainScreen"
+		},
+		"SwapTokenScreen": {
+			"text": "Enter Token: (ie. ETH, USDC)",
+			"screen_type": "Function",
+			"function": "validate_token",
+			"default_next_screen": "SwapTokenAmountScreen"
+		},
+		"SwapTokenAmountScreen": {
+			"text": "Amount:",
+			"screen_type": "Function",
+			"function": "validate_amount",
+			"default_next_screen": "SwapTokenPinScreen"
+		},
+		"SwapTokenReceiverScreen": {
+			"text": "Receiver",
+			"screen_type": "Function",
+			"function": "validate_phone_number",
+			"default_next_screen": "SwapTokenPinScreen"
+		},
+		"SwapTokenPinScreen": {
+			"text": "PIN:",
+			"screen_type": "Function",
+			"function": "validate_pin",
+			"default_next_screen": "CancelTXScreen"
+		},
+		"BalancePinScreen": {
+			"text": "PIN:",
+			"screen_type": "Function",
+			"function": "validate_pin",
+			"default_next_screen": "DefaultNoneScreen"
+		},
+		"WithdrawAmountScreen": {
+			"text": "Amount:",
+			"screen_type": "Function",
+			"function": "validate_amount",
+			"default_next_screen": "WithdrawPinScreen"
+		},
+		"WithdrawPinScreen": {
+			"text": "PIN:",
+			"screen_type": "Function",
+			"function": "validate_pin",
+			"default_next_screen": "DefaultNoneScreen"
+		},
+		"AccountScreen": {
+			"text": "My Account:",
+			"screen_type": "Menu",
+			"default_next_screen": "DefaultNoneScreen",
+			"menu_items": {
+				"BaseToken": {
+					"option": "1",
+					"display_name": "Base Token",
+					"next_screen": "DefaultNoneScreen"
+				},
+				"InstantWithdraw": {
+					"option": "2",
+					"display_name": "Instant Withdraw",
+					"next_screen": "DefaultNoneScreen"
+				},
+				"Address": {
+					"option": "3",
+					"display_name": "Address",
+					"next_screen": "DefaultNoneScreen"
+				}													
+			}
 		}
 	}
 	,
@@ -131,6 +195,9 @@
 		},
 		"cancel_tx": {
 			"function_name": "cancel_tx"
+		},
+		"validate_token": {
+			"function_name": "validate_token"
 		}
 	}
 }
