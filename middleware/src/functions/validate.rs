@@ -10,7 +10,8 @@ use spacetimedb::ReducerContext;
 fn is_valid_e164(phone: &str) -> bool {
     // must start with +
     let bytes = phone.as_bytes();
-    if bytes.is_empty() || bytes[0] != b'+' {
+    // if bytes.is_empty() || bytes[0] != b'+' {
+    if bytes.is_empty() {
         return false;
     }
 
@@ -39,12 +40,16 @@ fn is_valid_e164(phone: &str) -> bool {
 pub fn validate_phone_number(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSession, String> {
     let parts: Vec<&str> = parse_input(&session.data);
 
-    //1*PHONE_NUMBER
-    if parts.len() != 2 {
+    // Dynamic position based on operation: OP or OP*PHONE_NUMBER
+    let phone_position = if parts.len() == 2 {
+        1 // First phone input: OP*PHONE_NUMBER
+    } else if parts.len() > 2 {
+        3 // Still in position 1 for multi-part inputs
+    } else {
         return Err("Invalid input format".to_string());
-    }
+    };
 
-    let phone_number = parts[1];
+    let phone_number = parts[phone_position];
 
     if !is_valid_e164(&phone_number) {
         return Err("Invalid phone number format".to_string());
@@ -55,13 +60,23 @@ pub fn validate_phone_number(ctx: &ReducerContext, session: USSDSession) -> Resu
 
 pub fn validate_amount(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSession, String> {
     let parts: Vec<&str> = parse_input(&session.data);
+    
+    let amount_position = if parts.len() >= 3 {
+        2 // OP*PHONE*AMOUNT
+    } else if parts.len() == 2 {
+        1 // OP*AMOUNT (for withdraw)
+    } else {
+        return Err("Invalid input format".to_string());
+    };
+    
+    let amount = parts[amount_position];
 
     //1*PHONE_NUMBER*AMOUNT
-    if parts.len() != 3 {
-        return Err("Invalid input format".to_string());
-    }
+    // if parts.len() != 3 {
+    //     return Err("Invalid input format".to_string());
+    // }
     
-    let amount = parts[2];
+    // let amount = parts[2];
     
     amount
         .parse::<f64>()
@@ -166,7 +181,7 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
             });
             // Add confirmation text to the session
             let confirmation_text = format!(
-                "Confirm TX:\nTo: {}\nAmount: {} ETH\nFee: {}\nTotal: {}",
+                "Confirm TX:\nTo: {}\nAmount: {} ETH\nFee: {}\nTotal: {}\n\n1. Confirm\n2. Cancel",
                 phone_number,
                 amount,
                 "0.001",  // TODO: Calculate or fetch actual fee
@@ -186,6 +201,31 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
     return Err("User Not registered".to_string());
     
     
+}
+
+pub fn validate_token(ctx: &ReducerContext, session: USSDSession) -> Result<USSDSession, String> {
+    let parts: Vec<&str> = parse_input(&session.data);
+    
+    //2*TOKEN*AMOUNT*RECEIVER*PIN*CANCEL_TX
+    if parts.len() != 2 {
+        return Err("Invalid input format".to_string());
+    }
+    
+    let binding = parts[1].to_uppercase();
+    let token_symbol = binding.trim();
+    
+    // List of supported tokens
+    let supported_tokens = vec!["ETH", "USDC", "USDT", "DAI", "WETH"];
+    
+    if supported_tokens.contains(&token_symbol) {
+        Ok(session)
+    } else {
+        Err(format!(
+            "Token '{}' not supported. Available: {}",
+            token_symbol,
+            supported_tokens.join(", ")
+        ))
+    }
 }
 
 
