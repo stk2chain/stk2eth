@@ -2,7 +2,7 @@ use crate::functions::{hash_pin, parse_input };
 use crate::auth::list::{hashing::create_phone_permit2_authorization, auth_7702, Auth7702, AuthStatus};
 use crate::auth::pin::{user_pin, UserPIN};
 use crate::auth::wallet::{esim_profile, EsimProfile};
-use crate::eth::tx::{eth_tx, EthTx, TxStatus, TxType, TxParams, Params};
+use crate::eth::tx::{eth_tx, EthTx, TxStatus, TxType};
 use crate::ussd::session::USSDSession;
 use spacetimedb::Table;    
 use spacetimedb::ReducerContext;
@@ -99,7 +99,7 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
         return Err("Invalid input format".to_string());
     }
 
-    let tx_type = match TxType::from_ussd_op(parts[0]) {
+    let _tx_type = match TxType::from_ussd_op(parts[0]) {
         Some(st) => st,
         None => return Err("Invalid swap type".to_string()),
     };
@@ -161,24 +161,23 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
                 });
             }
 
-            let params = Params {
-                to: Some(&receiver_wallet.clone()),
-                amount: Some(amount.parse::<u128>().unwrap()),
-                ..Default::default()
-            };
-            
-            let calldata = tx_type.to_tx(params).encode();
-
             let sender_wallet = ctx.db.esim_profile().phone_number().find(session.phone_number.clone()).unwrap();
             ctx.db.eth_tx().insert(EthTx {
+                id: 0, // auto-inc
                 session_id: session.session_id.clone(),
+                tx_type: TxType::SendEth,
                 from: sender_wallet.wallet_address.clone(),
                 to: receiver_wallet.clone(),
                 value: amount.to_string(),
-                data: Some(calldata),
-                gas_limit: "21000".to_string(),
+                data: None,
+                gas_limit: "100000".to_string(),
                 status: TxStatus::Pending,
                 tx_hash: None,
+                block_number: None,
+                gas_used: None,
+                error_reason: None,
+                processing_by: None,
+                processing_since: None,
                 created_at: ctx.timestamp,
                 updated_at: ctx.timestamp,
             });

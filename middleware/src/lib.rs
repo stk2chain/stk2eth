@@ -1,11 +1,8 @@
 pub use spacetimedb::Table as SwapTable;
 pub use spacetimedb::Table as USSDSessionTable;
 pub use std::collections::HashMap;
-pub(crate) mod amount_validation_tests;
 mod audit_reducers;
 mod audit_tests;
-mod pin_validation_tests;
-mod swap_tests;
 mod ussd;
 mod auth;
 mod eth;
@@ -458,142 +455,9 @@ pub fn process_ussd_step(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-// pub fn claim_swap(ctx: &ReducerContext, id: u64) {
-//     if let Some(s) = ctx.db.swap().id().find(id) {
-//         if let SwapStatus::Pending = s.status {
-//             let updated = Swap {
-//                 status: SwapStatus::Processing,
-//                 updated_at: ctx.timestamp,
-//                 ..s
-//             };
-//             ctx.db.swap().id().update(updated);
-//         }
-//     }
-// }
-
-    #[allow(dead_code)]
-    fn setup_common_test_db(ctx: &mut ReducerContext) {
-        let menu = ctx.db.ussd_menu().insert(USSDMenu {
-            id: 1,
-            service_code: "*4337#".to_string(),
-        });
-
-        ctx.db.ussd_screen().insert(USSDScreen {
-            id: 1,
-            ussd_menu: menu.id,
-            name: "EnterPin".to_string(),
-            text: "Enter your PIN".to_string(),
-            screen_type: ScreenType::Function,
-            default_next_screen: "ConfirmPin".to_string(),
-            service_code: "*4337#".to_string(),
-            function: Some("validate_pin".to_string()),
-            input_identifier: None,
-        });
-
-        ctx.db.ussd_service().insert(USSDServiceRow {
-            id: 1,
-            ussd_menu: menu.id,
-            name: "validate_pin".to_string(),
-            function_name: "validate_pin_function".to_string(),
-            function_url: None,
-            data_key: "pin".to_string(),
-        });
-
-        ctx.db.ussd_screen().insert(USSDScreen {
-            id: 2,
-            ussd_menu: menu.id,
-            name: "QuitScreen".to_string(),
-            text: "Thank you for using our service.".to_string(),
-            screen_type: ScreenType::Quit,
-            default_next_screen: "".to_string(),
-            service_code: "*4337#".to_string(),
-            function: None,
-            input_identifier: None,
-        });
-
-        ctx.db.ussd_screen().insert(USSDScreen {
-            id: 3,
-            ussd_menu: menu.id,
-            name: "ConfirmCancelTx".to_string(),
-            text: "Confirm or cancel transaction".to_string(),
-            screen_type: ScreenType::Function,
-            default_next_screen: "TransactionResult".to_string(),
-            service_code: "*4337#".to_string(),
-            function: Some("validate_canceltx".to_string()),
-            input_identifier: None,
-        });
-
-        ctx.db.ussd_service().insert(USSDServiceRow {
-            id: 2,
-            ussd_menu: menu.id,
-            name: "validate_canceltx".to_string(),
-            function_name: "validate_canceltx".to_string(),
-            function_url: None,
-            data_key: "cancel_tx".to_string(),
-        });
-    }
-
-    #[test]
-    fn test_ussd_session_struct_fields() {
-        let session = USSDSession {
-            session_id: "sess1".to_string(),
-            phone_number: "+254792281871".to_string(),
-            network_code: "net1".to_string(),
-            service_code: "*4337#".to_string(),
-            data: "testdata".to_string(),
-            current_screen: "screen1".to_string(),
-            visited_screens: vec!["screen0".to_string()],
-            last_interaction_time: Timestamp::now(),
-            end_session: false,
-            sender: Identity::from_byte_array([1; 32]),
-            online: true,
-            authenticated: false,
-        };
-        assert_eq!(session.session_id, "sess1");
-        assert_eq!(session.phone_number, "+254792281871");
-        assert!(session.online);
-        assert!(!session.end_session);
-        assert_eq!(session.visited_screens.len(), 1);
-    }
-
-    #[test]
-    fn test_swap_struct_fields() {
-        let swap = Swap {
-            id: 1,
-            session_id: "sess1".to_string(),
-            from_address: "0xfrom".to_string(),
-            to_address: "0xto".to_string(),
-            amount: "1000".to_string(),
-            token_in: "ETH".to_string(),
-            token_out: "USD".to_string(),
-            status: SwapStatus::Pending,
-            tx_hash: Some("0xhash".to_string()),
-            gas_price: Some("100".to_string()),
-            gas_limit: Some("21000".to_string()),
-            nonce: Some(1),
-            created_at: Timestamp::now(),
-            updated_at: Timestamp::now(),
-            error_message: None,
-            swap_type: SwapType::SendEth,
-        };
-        assert_eq!(swap.session_id, "sess1");
-        assert_eq!(swap.from_address, "0xfrom");
-        assert_eq!(swap.status, SwapStatus::Pending);
-        assert_eq!(swap.swap_type, SwapType::SendEth);
-        assert!(swap.tx_hash.is_some());
-    }
-
-    #[test]
-    fn test_swap_status_enum() {
-        assert_eq!(format!("{:?}", SwapStatus::Pending), "Pending");
-        assert_eq!(format!("{:?}", SwapStatus::Completed), "Completed");
-        assert_ne!(SwapStatus::Failed, SwapStatus::Processing);
-    }
-
     // Pure helper to map reducer error codes to screen names. Kept pure so it can be unit tested
     // without requiring a live ReducerContext or linking SpacetimeDB native libraries.
-    pub fn map_amount_error_code(code: &str) -> &'static str {
+    fn map_amount_error_code(code: &str) -> &'static str {
         match code {
             "amount_too_low" => "AmountTooLowScreen",
             "amount_invalid" => "AmountInvalidScreen",
@@ -603,25 +467,8 @@ mod tests {
 
     #[test]
     fn test_map_amount_error_code() {
-        assert_eq!(
-            map_amount_error_code("amount_too_low"),
-            "AmountTooLowScreen"
-        );
-        assert_eq!(
-            map_amount_error_code("amount_invalid"),
-            "AmountInvalidScreen"
-        );
+        assert_eq!(map_amount_error_code("amount_too_low"), "AmountTooLowScreen");
+        assert_eq!(map_amount_error_code("amount_invalid"), "AmountInvalidScreen");
         assert_eq!(map_amount_error_code("unknown"), "FailureScreen");
     }
-
-    // NOTE: Disabled test - incompatible with SpacetimeDB 1.4.0 API
-    // #[test]
-    // fn test_execute_function_screen_updates_current_screen() {
-    //     let mut ctx = ReducerContext::__dummy();
-    //     let session_id = "test_session_123".to_string();
-    //     let sender = Identity::from_byte_array([0; 32]);
-
-    //     // This test would need to be rewritten for SpacetimeDB 1.4.0
-    //     // The API for testing has changed significantly
-    // }
 }

@@ -3,18 +3,17 @@ use spacetimedb::SpacetimeType;
 #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
 pub enum TxType {
     SendEth,
-    TokenSwap,
-    CashOut,
-    Balance,
+    WithdrawEscrow,
+    WithdrawRefund,
 }
 
 #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
 pub enum TxStatus {
     Pending,
-    Processing,
-    Completed,
+    Submitted,
+    Broadcasting,
+    Broadcast,
+    Confirmed,
     Failed,
-    Cancelled
+    Cancelled,
 }
-
-
