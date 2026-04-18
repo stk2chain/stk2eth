@@ -1,15 +1,4 @@
-use super::{types::TxType, params::{TxParams, Params}};
-
-
-const fn keccak256_simple(data: &[u8]) -> [u8; 4] {
-    let mut hash = [0u8; 4];
-    let mut i = 0;
-    while i < data.len() {
-        hash[i % 4] = hash[i % 4].wrapping_add(data[i]);
-        i += 1;
-    }
-    hash
-}
+use super::{types::TxType, params::{TxParams, Params}, selector::keccak_selector};
 
 fn uint256(v: u128) -> [u8; 32] {
     let mut buf = [0u8; 32];
@@ -55,7 +44,7 @@ impl TxType {
     
     
     pub fn selector(&self) -> [u8; 4] {
-        keccak256_simple(self.signature().as_bytes())
+        keccak_selector(self.signature())
     }
 
     pub fn to_tx<'a>(&self, params: Params<'a>) -> TxParams<'a> {
