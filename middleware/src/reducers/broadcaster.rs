@@ -5,6 +5,10 @@ use spacetimedb::{reducer, ReducerContext, Table};
 
 const GATEWAY_IDENTITY_KEY: &str = "gateway_identity";
 
+fn is_terminal(s: &TxStatus) -> bool {
+    matches!(s, TxStatus::Confirmed | TxStatus::Failed | TxStatus::Cancelled)
+}
+
 fn require_gateway(ctx: &ReducerContext) -> Result<(), String> {
     let cfg = ctx.db.app_config().key().find(GATEWAY_IDENTITY_KEY.to_string())
         .ok_or_else(|| "gateway identity not configured".to_string())?;
@@ -45,6 +49,10 @@ pub fn mark_eth_tx_processing(ctx: &ReducerContext, eth_tx_id: u64, worker_id: S
         Some(r) => r,
         None => { log::error!("eth_tx {} not found", eth_tx_id); return; }
     };
+    if is_terminal(&row.status) {
+        log::warn!("eth_tx {} already in terminal state {:?}", eth_tx_id, row.status);
+        return;
+    }
     if let (Some(_other), Some(since)) = (&row.processing_by, row.processing_since) {
         let elapsed = ctx.timestamp.duration_since(since).unwrap_or_default();
         if elapsed < std::time::Duration::from_secs(5 * 60) {
@@ -65,6 +73,10 @@ pub fn mark_eth_tx_processing(ctx: &ReducerContext, eth_tx_id: u64, worker_id: S
 pub fn mark_eth_tx_broadcast(ctx: &ReducerContext, eth_tx_id: u64, tx_hash: String) {
     if let Err(e) = require_gateway(ctx) { log::error!("{}", e); return; }
     if let Some(row) = ctx.db.eth_tx().id().find(eth_tx_id) {
+        if is_terminal(&row.status) {
+            log::warn!("eth_tx {} already terminal, ignoring mark_eth_tx_broadcast", eth_tx_id);
+            return;
+        }
         ctx.db.eth_tx().id().update(EthTx {
             status: TxStatus::Broadcast,
             tx_hash: Some(tx_hash),
@@ -84,6 +96,10 @@ pub fn confirm_eth_tx(
 ) {
     if let Err(e) = require_gateway(ctx) { log::error!("{}", e); return; }
     if let Some(row) = ctx.db.eth_tx().id().find(eth_tx_id) {
+        if is_terminal(&row.status) {
+            log::warn!("eth_tx {} already terminal, ignoring confirm_eth_tx", eth_tx_id);
+            return;
+        }
         ctx.db.eth_tx().id().update(EthTx {
             status: TxStatus::Confirmed,
             tx_hash: Some(tx_hash),
@@ -99,6 +115,10 @@ pub fn confirm_eth_tx(
 pub fn fail_eth_tx(ctx: &ReducerContext, eth_tx_id: u64, tx_hash: Option<String>, reason: String) {
     if let Err(e) = require_gateway(ctx) { log::error!("{}", e); return; }
     if let Some(row) = ctx.db.eth_tx().id().find(eth_tx_id) {
+        if is_terminal(&row.status) {
+            log::warn!("eth_tx {} already terminal, ignoring fail_eth_tx", eth_tx_id);
+            return;
+        }
         ctx.db.eth_tx().id().update(EthTx {
             status: TxStatus::Failed,
             tx_hash,
