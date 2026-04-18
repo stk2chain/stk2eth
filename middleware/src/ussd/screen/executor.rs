@@ -72,9 +72,7 @@ impl USSDScreen {
             });
                 
         if let Some(svc) = svc_opt {
-            let loaded_function = svc.load_function();
-            loaded_function(ctx, session)
-                    
+            svc.execute_fn(ctx, session)
         } else {
             return Err(format!("Function not found for screen '{}'", self.name))
         }

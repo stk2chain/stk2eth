@@ -21,7 +21,6 @@ rust_decimal = "1.33"
 dotenv = "0.15"
 
 # helpers
-lazy_static = "1.4.0"
 k256 = "0.13.4"
 hex = "0.4.3"
 rlp = "0.6.1"

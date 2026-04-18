@@ -14,7 +14,6 @@ use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table
 
 use anyhow::Result;
 
-use crate::ussd::service::utils::FUNCTION_MAP;
 use ussd::*;
 use auth::*;
 use eth::*;
@@ -276,10 +275,6 @@ pub fn init(ctx: &ReducerContext) {
         });
 
     }
-    
-    //Register all functions
-    // register_functions();
-    
     log::info!("USSDGETH Ininialized by, {}!", ctx.sender);
 }
 
