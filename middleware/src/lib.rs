@@ -3,9 +3,12 @@ pub use spacetimedb::Table as USSDSessionTable;
 pub use std::collections::HashMap;
 mod audit_reducers;
 mod audit_tests;
+mod tables;
 mod ussd;
 mod auth;
 mod eth;
+
+pub use tables::*;
 use serde::{Deserialize, Serialize};
 use spacetimedb::{reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
