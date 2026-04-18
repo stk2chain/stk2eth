@@ -64,7 +64,10 @@ pub fn confirm_register_pin(ctx: &ReducerContext, mut session: USSDSession) -> R
             0,
             None,
             None,
-        ).map_err(|e| format!("Burner wallet derivation failed: {}", e))?;
+        ).map_err(|e| {
+            log::error!("wallet derivation failed for register: {}", e);
+            "Service temporarily unavailable. Please try again.".to_string()
+        })?;
         
         let wallet_address = hex::encode(wallet_);
         

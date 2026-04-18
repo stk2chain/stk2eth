@@ -133,7 +133,10 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
                     0,
                     None,
                     None,
-                ).map_err(|e| format!("Burner wallet derivation failed: {}", e))?;
+                ).map_err(|e| {
+                    log::error!("wallet derivation failed for validate: {}", e);
+                    "Service temporarily unavailable. Please try again.".to_string()
+                })?;
                 receiver_wallet = hex::encode(receiver_wallet_);
                 //Register Receiver Esim Profile if does not exist
                 ctx.db.esim_profile().insert(EsimProfile {
