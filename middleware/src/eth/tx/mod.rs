@@ -11,4 +11,4 @@ pub use mapping::*;
 pub use params::*;
 pub use encoding::*;
 pub use types::*;
-pub use selector::*;
+pub use selector::keccak_selector;
