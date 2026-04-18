@@ -4,6 +4,25 @@ use rlp::{RlpStream, Encodable};
 use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
 use std::env;
 
+const NICK_MAX_ATTEMPTS: u64 = 1_000_000;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AuthGenError {
+    DerivationExhausted { attempts: u64 },
+    InvalidDelegateAddress,
+}
+
+impl std::fmt::Display for AuthGenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AuthGenError::DerivationExhausted { attempts } =>
+                write!(f, "Nick's Method exhausted after {} attempts", attempts),
+            AuthGenError::InvalidDelegateAddress =>
+                write!(f, "delegate address must be 0x-prefixed 20-byte hex"),
+        }
+    }
+}
+
 fn get_permit2_address() -> String {
     env::var("PERMIT2_7702_ADDRESS")
         .unwrap_or_else(|_| "0x2fDdd08Fb3e796bc68B1a26f3D1a61b073860fEf".to_string())
@@ -162,33 +181,25 @@ fn recover_address(r: &[u8; 32], s: &[u8; 32], v: u8, msg_hash: &[u8; 32]) -> Op
     Some(address)
 }
 
-fn nick_auth_7702(mut r: [u8; 32], s: [u8; 32], v: u8, msg_hash: &[u8; 32]) -> ([u8; 20], [u8; 32], u8) {
-    log::info!("Searching for valid signature with phone-derived salt...");
+fn nick_auth_7702(
+    mut r: [u8; 32], s: [u8; 32], v: u8, msg_hash: &[u8; 32],
+) -> Result<([u8; 20], [u8; 32], u8), AuthGenError> {
     let mut attempts = 0u64;
-    let mut current_v = v;
-    
-    loop {
+    while attempts < NICK_MAX_ATTEMPTS {
         attempts += 1;
-        
-        if let Some(address) = recover_address(&r, &s, current_v, msg_hash) {
-            log::info!("✓ Found valid signature after {} attempts", attempts);
-            return (address, r, current_v);
+        if let Some(address) = recover_address(&r, &s, v, msg_hash) {
+            log::info!("Nick's Method derivation succeeded in {} attempts", attempts);
+            return Ok((address, r, v));
         }
-        
         let mut carry = 1u16;
         for i in (0..32).rev() {
             let sum = r[i] as u16 + carry;
             r[i] = sum as u8;
             carry = sum >> 8;
-            if carry == 0 {
-                break;
-            }
-        }
-        
-        if attempts % 1000 == 0 {
-            log::info!("  ... {} attempts", attempts);
+            if carry == 0 { break; }
         }
     }
+    Err(AuthGenError::DerivationExhausted { attempts })
 }
 
 pub fn create_phone_permit2_authorization(
@@ -197,26 +208,28 @@ pub fn create_phone_permit2_authorization(
     nonce: u64,
     user_salt: Option<&str>,
     delegate_to: Option<&str>,
-) -> ([u8; 20], SignedAuthorization) {
+) -> Result<([u8; 20], SignedAuthorization), AuthGenError> {
     let binding = get_permit2_address();
     let delegate_address = delegate_to.unwrap_or(&binding);
+
+    if !delegate_address.starts_with("0x") || delegate_address.len() != 42 {
+        return Err(AuthGenError::InvalidDelegateAddress);
+    }
+
     let phone_salt = phone_to_salt(phone_number, user_salt);
     let msg_hash = hash_auth7702_message(chain_id, delegate_address, nonce);
-    
+
     let mut r = [0u8; 32];
     r.copy_from_slice(&msg_hash);
-    
-    // Normalize s to ensure it's in the lower half
+
     let (s, v) = normalize_s(phone_salt, 27);
-    
-    log::info!("Using normalized s value (low-s form)");
-    
-    let (authority_address, final_r, final_v) = nick_auth_7702(r, s, v, &msg_hash);
-    
+    let (authority_address, final_r, final_v) = nick_auth_7702(r, s, v, &msg_hash)?;
+
     let mut addr_bytes = [0u8; 20];
-    let delegate_bytes = hex::decode(&delegate_address[2..]).expect("Invalid address");
+    let delegate_bytes = hex::decode(&delegate_address[2..])
+        .map_err(|_| AuthGenError::InvalidDelegateAddress)?;
     addr_bytes.copy_from_slice(&delegate_bytes);
-    
+
     let signed_auth = SignedAuthorization {
         chain_id,
         address: addr_bytes,
@@ -225,6 +238,32 @@ pub fn create_phone_permit2_authorization(
         r: final_r,
         s,
     };
-    
-    (authority_address, signed_auth)
+    Ok((authority_address, signed_auth))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derives_valid_wallet_for_real_phone() {
+        let phone = "+254712345678";
+        let result = create_phone_permit2_authorization(
+            phone,
+            84532,
+            0,
+            None,
+            Some("0x2fDdd08Fb3e796bc68B1a26f3D1a61b073860fEf"),
+        );
+        let (wallet, _signed) = result.expect("derivation must succeed within attempt bound");
+        assert_ne!(wallet, [0u8; 20], "wallet address must be non-zero");
+    }
+
+    #[test]
+    fn determinism_same_phone_same_wallet() {
+        let phone = "+254712345678";
+        let (w1, _) = create_phone_permit2_authorization(phone, 84532, 0, None, None).unwrap();
+        let (w2, _) = create_phone_permit2_authorization(phone, 84532, 0, None, None).unwrap();
+        assert_eq!(w1, w2);
+    }
 }

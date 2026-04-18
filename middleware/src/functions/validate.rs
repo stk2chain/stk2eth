@@ -129,11 +129,11 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
                 //TODO: Generate receiver wallet
                 let (receiver_wallet_, _auth) = create_phone_permit2_authorization(
                     &phone_number,
-                    0, //Universal Chain ID
+                    84532, // Base Sepolia
                     0,
                     None,
                     None,
-                );
+                ).map_err(|e| format!("Burner wallet derivation failed: {}", e))?;
                 receiver_wallet = hex::encode(receiver_wallet_);
                 //Register Receiver Esim Profile if does not exist
                 ctx.db.esim_profile().insert(EsimProfile {

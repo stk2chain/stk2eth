@@ -60,11 +60,11 @@ pub fn confirm_register_pin(ctx: &ReducerContext, mut session: USSDSession) -> R
     if !ctx.db.esim_profile().phone_number().find(&session.phone_number).is_some() {
         let (wallet_, _auth) = create_phone_permit2_authorization(
             &session.phone_number,
-            0, //Universal Chain ID
+            84532, // Base Sepolia
             0,
             None,
             None,
-        );
+        ).map_err(|e| format!("Burner wallet derivation failed: {}", e))?;
         
         let wallet_address = hex::encode(wallet_);
         
