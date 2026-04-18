@@ -1,7 +1,7 @@
 use crate::functions::{hash_pin, parse_input };
 use crate::auth::list::{hashing::create_phone_permit2_authorization, auth_7702, Auth7702, AuthStatus};
 use crate::auth::pin::{user_pin, UserPIN};
-use crate::auth::wallet::{esim_profile, PhoneWallet, EsimProfile};
+use crate::auth::wallet::{esim_profile, EsimProfile};
 use crate::eth::tx::{eth_tx, EthTx, TxStatus, TxType, TxParams, Params};
 use crate::ussd::session::USSDSession;
 use spacetimedb::Table;    

@@ -1,5 +1,5 @@
 // ussdgeth/src/reducers/validate_phone.rs
-use crate::auth::wallet::{esim_profile, PhoneWallet, EsimProfile};
+use crate::auth::wallet::{esim_profile, EsimProfile};
 use crate::auth::list::{auth_7702, Auth7702, AuthStatus};
 use spacetimedb::{reducer, ReducerContext, Table};
 use std::str;
