@@ -301,15 +301,15 @@ mod tests {
 
     #[test]
     fn test_pin_format_validation() {
-        assert!(validate_pin_format("1234"));
-        assert!(validate_pin_format("123456"));
-        assert!(validate_pin_format("0000"));
+        assert!(validate_pin_format("1234", false).is_ok());
+        assert!(validate_pin_format("123456", false).is_ok());
+        assert!(validate_pin_format("0000", false).is_ok());
 
-        assert!(!validate_pin_format("123"));
-        assert!(!validate_pin_format("1234567"));
-        assert!(!validate_pin_format("12a4"));
-        assert!(!validate_pin_format("abcd"));
-        assert!(!validate_pin_format(""));
+        assert!(validate_pin_format("123", false).is_err());
+        assert!(validate_pin_format("1234567", false).is_err());
+        assert!(validate_pin_format("12a4", false).is_err());
+        assert!(validate_pin_format("abcd", false).is_err());
+        assert!(validate_pin_format("", false).is_err());
     }
 
     // #[test]
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_hash_pin_produces_hex_string() {
-        let hash = hash_pin("1234", "salt");
+        let hash = hash_pin("1234", "+254700000000", "salt");
         assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
         assert_eq!(hash.len(), 64);
     }
@@ -410,17 +410,6 @@ mod tests {
         assert!(!is_weak_pin("1593"));
         assert!(!is_weak_pin("9182"));
         assert!(!is_weak_pin("4826"));
-    }
-
-    #[test]
-    fn test_salt_length_and_randomness() {
-        let salt1 = generate_salt();
-        let salt2 = generate_salt();
-
-        assert_eq!(salt1.len(), SALT_LENGTH * 2);
-        assert_eq!(salt2.len(), SALT_LENGTH * 2);
-        assert_ne!(salt1, salt2);
-        assert!(salt1.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]

@@ -1,3 +1,4 @@
+pub mod intent;
 pub mod screen;
 pub mod service;
 pub mod session;
