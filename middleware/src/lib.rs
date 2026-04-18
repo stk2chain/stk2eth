@@ -1,5 +1,3 @@
-pub use spacetimedb::Table as SwapTable;
-pub use spacetimedb::Table as USSDSessionTable;
 pub use std::collections::HashMap;
 mod audit_reducers;
 mod audit_tests;
@@ -115,45 +113,6 @@ pub struct EthAuditLog {
 
 
 
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// #[table(name = swap, public)]
-// pub struct Swap {
-//     #[primary_key]
-//     #[auto_inc]
-//     pub id: u64,
-//     pub session_id: String,
-//     pub from_address: String,
-//     pub to_address: String,
-//     pub amount: String,
-//     pub token_in: String,
-//     pub token_out: String,
-//     pub status: SwapStatus,
-//     pub tx_hash: Option<String>,
-//     pub gas_price: Option<String>,
-//     pub gas_limit: Option<String>,
-//     pub nonce: Option<u64>,
-//     pub created_at: Timestamp,
-//     pub updated_at: Timestamp,
-//     pub error_message: Option<String>,
-//     pub swap_type: SwapType,
-// }
-
-// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-// pub enum SwapStatus {
-//     Pending,
-//     Processing,
-//     Completed,
-//     Failed,
-//     Cancelled,
-// }
-
-// #[derive(SpacetimeType, Debug, Clone, PartialEq, Eq)]
-// pub enum SwapType {
-//     SendEth,
-//     TokenSwap,
-//     CashOut,
-// }
 
 #[table(name = app_config)]
 pub struct AppConfig {
@@ -295,14 +254,6 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
 }
 
 
-fn _check_profile_exists(ctx: &ReducerContext, phone_number: String) -> Option<EsimProfile> {
-    ctx.db.esim_profile().phone_number().find(phone_number.clone())
-}
-
-fn _check_session_exists(ctx: &ReducerContext, session_id: String) -> Option<USSDSession> {
-    ctx.db.ussd_session().session_id().find(session_id.clone())
-}
-
 fn session_update_or_create(
     ctx: &ReducerContext,
     session_id: String,
@@ -386,9 +337,9 @@ pub fn process_ussd_step(
     if let Some(_code) = ctx.db.ussd_code().service_code().find(service_code.clone()) {
         //Does phone number EsimProfile exist in DB?
 
-        let _profile = _check_profile_exists(ctx, normalize_phone_number(&phone_number.clone()));
-
-        let _session = _check_session_exists(ctx, session_id.clone());
+        let _profile = ctx.db.esim_profile().phone_number()
+            .find(normalize_phone_number(&phone_number.clone()));
+        let _session = ctx.db.ussd_session().session_id().find(session_id.clone());
 
 
         // Handle USSD Session processing
