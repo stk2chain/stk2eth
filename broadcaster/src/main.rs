@@ -3,6 +3,7 @@
 mod abi;
 mod config;
 mod error;
+mod reconcile;
 mod signer;
 mod stdb;
 mod submitter;
