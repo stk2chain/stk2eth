@@ -1,5 +1,6 @@
 // broadcaster/src/main.rs
 
+mod abi;
 mod config;
 mod error;
 mod signer;
