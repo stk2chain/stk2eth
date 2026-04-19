@@ -1,6 +1,4 @@
 // broadcaster/tests/helpers/mod.rs
-// Spawns anvil as a forked Base Sepolia chain and provides a helper to set
-// code + balance on burner addresses, plus a local SpacetimeDB harness.
 
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
@@ -13,8 +11,7 @@ pub struct Anvil {
 }
 
 impl Anvil {
-    pub fn spawn_base_sepolia_fork() -> Self {
-        let port = 8545;
+    pub fn spawn_base_sepolia_fork(port: u16) -> Self {
         let child = Command::new("anvil")
             .args([
                 "--fork-url",
@@ -23,21 +20,46 @@ impl Anvil {
                 &port.to_string(),
                 "--chain-id",
                 "84532",
-                "--no-mining",
             ])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .expect("anvil not found on PATH — install Foundry");
-
+            .expect("anvil not found on PATH");
         std::thread::sleep(Duration::from_secs(2));
-
         Anvil {
             endpoint: format!("http://127.0.0.1:{port}"),
             ws_endpoint: format!("ws://127.0.0.1:{port}"),
             chain_id: 84532,
             _child: child,
         }
+    }
+
+    pub async fn set_balance(&self, addr: &str, wei: &str) {
+        let client = reqwest::Client::new();
+        let body = serde_json::json!({
+            "jsonrpc": "2.0", "method": "anvil_setBalance",
+            "params": [addr, wei], "id": 1,
+        });
+        client
+            .post(&self.endpoint)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+    }
+
+    pub async fn set_code(&self, addr: &str, code: &str) {
+        let client = reqwest::Client::new();
+        let body = serde_json::json!({
+            "jsonrpc": "2.0", "method": "anvil_setCode",
+            "params": [addr, code], "id": 1,
+        });
+        client
+            .post(&self.endpoint)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
     }
 }
 
@@ -49,4 +71,37 @@ impl Drop for Anvil {
 
 pub fn anvil_available() -> bool {
     Command::new("anvil").arg("--version").output().is_ok()
+}
+
+pub fn stdb_available() -> bool {
+    Command::new("spacetime").arg("--version").output().is_ok()
+}
+
+pub fn stdb_reset(db: &str) {
+    let _ = Command::new("spacetime").args(["delete", db]).output();
+    Command::new("spacetime")
+        .args(["publish", "--project-path", "../middleware", db])
+        .status()
+        .expect("spacetime publish failed");
+    Command::new("spacetime")
+        .args(["call", db, "claim_gateway_identity"])
+        .status()
+        .expect("claim_gateway_identity failed");
+}
+
+pub fn stdb_sql(db: &str, query: &str) -> String {
+    let out = Command::new("spacetime")
+        .args(["sql", db, query])
+        .output()
+        .expect("spacetime sql failed");
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+pub fn stdb_call(db: &str, reducer: &str, args: &[&str]) {
+    let mut cmd = Command::new("spacetime");
+    cmd.args(["call", db, reducer]);
+    for a in args {
+        cmd.arg(a);
+    }
+    cmd.status().expect("spacetime call failed");
 }
