@@ -1,5 +1,6 @@
 // broadcaster/src/main.rs
 
+mod config;
 mod error;
 mod stdb;
 
