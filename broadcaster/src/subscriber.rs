@@ -6,6 +6,7 @@
 use crate::error::BroadcasterError;
 use crate::stdb::{DbConnection, EthTxTableAccess, TxStatus};
 use spacetimedb_sdk::{DbContext, Table, TableWithPrimaryKey};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 /// A lightweight view of an `eth_tx` row for the submitter.
@@ -22,7 +23,7 @@ pub struct PendingRow {
 
 pub struct Subscriber {
     pub rx: mpsc::UnboundedReceiver<PendingRow>,
-    _conn: DbConnection,
+    pub stdb: Arc<DbConnection>,
     _driver: std::thread::JoinHandle<()>,
 }
 
@@ -46,6 +47,7 @@ impl Subscriber {
             })
             .build()
             .map_err(|e| BroadcasterError::Config(format!("STDB connect: {e}")))?;
+        let conn = Arc::new(conn);
 
         let tx_on_insert = tx.clone();
         conn.db.eth_tx().on_insert(move |_ctx, row| {
@@ -83,7 +85,7 @@ impl Subscriber {
 
         Ok(Subscriber {
             rx,
-            _conn: conn,
+            stdb: conn,
             _driver: driver,
         })
     }
