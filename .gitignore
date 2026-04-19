@@ -43,6 +43,7 @@ yarn-error.log
 # ----- Environment / secrets -----
 .env
 .env.*
+!.env.example
 secrets/
 *.pem
 *.key
