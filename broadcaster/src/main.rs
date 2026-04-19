@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod signer;
 mod stdb;
+mod submitter;
 mod subscriber;
 
 fn main() {
