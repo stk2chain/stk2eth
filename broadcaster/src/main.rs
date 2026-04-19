@@ -2,6 +2,7 @@
 
 mod config;
 mod error;
+mod signer;
 mod stdb;
 
 fn main() {
