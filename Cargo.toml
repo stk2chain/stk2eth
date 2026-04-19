@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "middleware",
-    "tools/validate_menu"
+    "tools/validate_menu",
+    "broadcaster",
 ]
 resolver = "2"
