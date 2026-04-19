@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod signer;
 mod stdb;
+mod subscriber;
 
 fn main() {
     eprintln!("broadcaster: not yet wired; run after Task 16 completes");
