@@ -25,7 +25,7 @@ impl std::fmt::Display for AuthGenError {
 
 fn get_permit2_address() -> String {
     env::var("PERMIT2_7702_ADDRESS")
-        .unwrap_or_else(|_| "0x2fDdd08Fb3e796bc68B1a26f3D1a61b073860fEf".to_string())
+        .unwrap_or_else(|_| "0x1ff0A24D1145d58Ea6F190569C10916E1a78F013".to_string())
 }
 
 #[derive(Clone)]
@@ -253,7 +253,7 @@ mod tests {
             84532,
             0,
             None,
-            Some("0x2fDdd08Fb3e796bc68B1a26f3D1a61b073860fEf"),
+            Some("0x1ff0A24D1145d58Ea6F190569C10916E1a78F013"),
         );
         let (wallet, _signed) = result.expect("derivation must succeed within attempt bound");
         assert_ne!(wallet, [0u8; 20], "wallet address must be non-zero");
