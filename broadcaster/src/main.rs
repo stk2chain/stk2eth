@@ -1,5 +1,6 @@
 // broadcaster/src/main.rs
 
+mod error;
 mod stdb;
 
 fn main() {
