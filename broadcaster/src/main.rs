@@ -78,7 +78,17 @@ async fn main() -> Result<(), BroadcasterError> {
             "SELECT * FROM eth_tx".to_string(),
         ]);
 
-    let expected_identity = stdb.identity();
+    let mut expected_identity = None;
+    for _ in 0..50 {
+        if let Some(id) = stdb.try_identity() {
+            expected_identity = Some(id);
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let expected_identity = expected_identity.ok_or_else(|| {
+        BroadcasterError::Config("SpacetimeDB identity not received within 5s".to_string())
+    })?;
     let expected_hex = format!("{}", expected_identity.to_hex());
     wait_for_gateway_identity(&stdb, &expected_hex).await?;
 
