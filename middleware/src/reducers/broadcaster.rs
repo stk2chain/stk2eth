@@ -21,26 +21,6 @@ fn require_gateway(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 #[reducer]
-pub fn set_gateway_identity(ctx: &ReducerContext, identity_str: String) {
-    if ctx.sender != ctx.identity() {
-        log::error!("set_gateway_identity: unauthorized sender {}", ctx.sender);
-        return;
-    }
-    if let Some(existing) = ctx.db.app_config().key().find(GATEWAY_IDENTITY_KEY.to_string()) {
-        ctx.db.app_config().key().update(AppConfig {
-            value: identity_str,
-            ..existing
-        });
-    } else {
-        ctx.db.app_config().insert(AppConfig {
-            key: GATEWAY_IDENTITY_KEY.to_string(),
-            value: identity_str,
-        });
-    }
-    log::info!("gateway identity set");
-}
-
-#[reducer]
 pub fn mark_eth_tx_processing(ctx: &ReducerContext, eth_tx_id: u64, worker_id: String) {
     if let Err(e) = require_gateway(ctx) {
         log::error!("mark_eth_tx_processing: {}", e); return;

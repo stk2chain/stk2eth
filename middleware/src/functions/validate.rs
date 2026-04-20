@@ -44,7 +44,34 @@ pub fn validate_amount(_ctx: &ReducerContext, session: USSDSession) -> Result<US
     if parsed <= 0.0 {
         return Err("Amount must be positive".to_string());
     }
+    eth_decimal_to_wei(&amount)?;
     Ok(session)
+}
+
+fn eth_decimal_to_wei(amount: &str) -> Result<String, String> {
+    let (int_part, frac_part) = match amount.split_once('.') {
+        Some((i, f)) => (i, f),
+        None => (amount, ""),
+    };
+    if int_part.is_empty() && frac_part.is_empty() {
+        return Err("Invalid amount format".to_string());
+    }
+    if !int_part.chars().all(|c| c.is_ascii_digit())
+        || !frac_part.chars().all(|c| c.is_ascii_digit())
+    {
+        return Err("Invalid amount format".to_string());
+    }
+    if frac_part.len() > 18 {
+        return Err("Amount precision exceeds 18 decimals".to_string());
+    }
+    let frac_padded = format!("{:0<18}", frac_part);
+    let combined = format!("{}{}", int_part, frac_padded);
+    let trimmed = combined.trim_start_matches('0');
+    Ok(if trimmed.is_empty() {
+        "0".to_string()
+    } else {
+        trimmed.to_string()
+    })
 }
 
 pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<USSDSession, String> {
@@ -98,13 +125,15 @@ pub fn validate_pin(ctx: &ReducerContext, mut session: USSDSession) -> Result<US
         .find(session.phone_number.clone())
         .ok_or_else(|| "Sender profile missing".to_string())?;
 
+    let amount_wei = eth_decimal_to_wei(&amount)?;
+
     ctx.db.eth_tx().insert(EthTx {
         id: 0,
         session_id: session.session_id.clone(),
         tx_type: TxType::SendEth,
         from: sender.wallet_address,
         to: receiver_wallet,
-        value: amount.clone(),
+        value: amount_wei,
         data: None,
         gas_limit: "100000".to_string(),
         status: TxStatus::Pending,

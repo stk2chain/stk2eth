@@ -2,3 +2,4 @@
 // pub mod keys;
 pub mod validate_phone;
 pub mod broadcaster;
+pub mod gateway_identity;
